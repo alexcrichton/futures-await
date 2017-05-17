@@ -4,7 +4,3 @@ version = "0.1.0"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 
 [workspace]
-
-[dependencies]
-futures-async-macro = { path = "futures-async-macro" }
-futures = "0.1"

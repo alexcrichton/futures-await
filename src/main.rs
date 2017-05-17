@@ -1,13 +1,14 @@
 #![feature(proc_macro, conservative_impl_trait, generators, generator_trait)]
 
-extern crate futures_await as futures;
+use std::ops::Generator;
 
-use futures::prelude::*;
-
-#[async]
-fn foo(a: i32) -> Result<i32, i32> {
-    Err(a)
+fn _foo(a: i32) -> Box<Generator<Yield = (), Return = i32>> {
+    Box::new((move || {
+        if false {
+            yield
+        }
+        a
+    })())
 }
 
-fn main() {
-}
+fn main() {}
