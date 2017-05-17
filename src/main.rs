@@ -2,13 +2,20 @@
 
 use std::ops::Generator;
 
-fn _foo(a: &i32) -> Box<Generator<Yield = (), Return = i32>> {
-    Box::new((move |a: &i32| {
+fn foo(a: &str) -> impl Generator<Yield = (), Return = String> {
+    (move |a: &str| {
         if false {
             yield
         }
-        *a
-    })(a))
+        a.to_string()
+    })(a)
 }
 
-fn main() {}
+fn main() {
+    let mut gen = {
+        let a = String::from("foo");
+        foo(&a)
+    };
+    String::from("bar");
+    println!("{:?}", gen.resume(()));
+}
