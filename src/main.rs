@@ -2,13 +2,13 @@
 
 use std::ops::Generator;
 
-fn _foo(a: i32) -> Box<Generator<Yield = (), Return = i32>> {
-    Box::new((move || {
+fn _foo(a: &i32) -> Box<Generator<Yield = (), Return = i32>> {
+    Box::new((move |a: &i32| {
         if false {
             yield
         }
-        a
-    })())
+        *a
+    })(a))
 }
 
 fn main() {}
