@@ -20,8 +20,8 @@ extern crate quote;
 extern crate syn;
 
 use proc_macro2::Span;
-use proc_macro::{TokenStream, TokenTree, Delimiter, TokenNode};
-use quote::{Tokens, ToTokens};
+use proc_macro::{Delimiter, TokenNode, TokenStream, TokenTree};
+use quote::{ToTokens, Tokens};
 use syn::*;
 use syn::fold::Folder;
 
@@ -40,8 +40,7 @@ pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
     // Parse our item, expecting a function. This function may be an actual
     // top-level function or it could be a method (typically dictated by the
     // arguments). We then extract everything we'd like to use.
-    let Item { attrs, node } = syn::parse(function)
-        .expect("failed to parse tokens as a function");
+    let Item { attrs, node } = syn::parse(function).expect("failed to parse tokens as a function");
     let ItemFn {
         ident,
         vis,
@@ -67,13 +66,14 @@ pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
     assert!(!variadic, "variadic functions cannot be async");
     let (output, rarrow_token) = match output {
         FunctionRetTy::Ty(t, rarrow_token) => (t, rarrow_token),
-        FunctionRetTy::Default => {
-            (TyTup {
+        FunctionRetTy::Default => (
+            TyTup {
                 tys: Default::default(),
                 lone_comma: Default::default(),
                 paren_token: Default::default(),
-            }.into(), Default::default())
-        }
+            }.into(),
+            Default::default(),
+        ),
     };
 
     // We've got to get a bit creative with our handling of arguments. For a
@@ -108,7 +108,7 @@ pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
         // `self: Box<Self>` will get captured naturally
         let mut is_input_no_pattern = false;
         if let FnArg::Captured(ref arg) = input {
-            if let Pat::Ident(PatIdent { ref ident, ..}) = arg.pat {
+            if let Pat::Ident(PatIdent { ref ident, .. }) = arg.pat {
                 if ident == "self" {
                     is_input_no_pattern = true;
                 }
@@ -116,22 +116,27 @@ pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
         }
         if is_input_no_pattern {
             inputs_no_patterns.push(input);
-            continue
+            continue;
         }
 
         match input {
             FnArg::Captured(ArgCaptured {
-                pat: syn::Pat::Ident(syn::PatIdent {
-                    mode: BindingMode::ByValue(_),
-                    ..
-                }),
+                pat:
+                    syn::Pat::Ident(syn::PatIdent {
+                        mode: BindingMode::ByValue(_),
+                        ..
+                    }),
                 ..
             }) => {
                 inputs_no_patterns.push(input);
             }
 
             // `ref a: B` (or some similar pattern)
-            FnArg::Captured(ArgCaptured { pat, ty, colon_token }) => {
+            FnArg::Captured(ArgCaptured {
+                pat,
+                ty,
+                colon_token,
+            }) => {
                 patterns.push(pat);
                 let ident = Ident::from(format!("__arg_{}", i));
                 temp_bindings.push(ident.clone());
@@ -141,11 +146,13 @@ pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
                     at_token: None,
                     subpat: None,
                 };
-                inputs_no_patterns.push(ArgCaptured {
-                    pat: pat.into(),
-                    ty,
-                    colon_token,
-                }.into());
+                inputs_no_patterns.push(
+                    ArgCaptured {
+                        pat: pat.into(),
+                        ty,
+                        colon_token,
+                    }.into(),
+                );
             }
 
             // Other `self`-related arguments get captured naturally
@@ -253,8 +260,7 @@ pub fn async_block(input: TokenStream) -> TokenStream {
         kind: TokenNode::Group(Delimiter::Brace, input),
         span: Default::default(),
     });
-    let expr = syn::parse(input)
-        .expect("failed to parse tokens as an expression");
+    let expr = syn::parse(input).expect("failed to parse tokens as an expression");
     let expr = ExpandAsyncFor.fold_expr(expr);
 
     let mut tokens = quote! {
@@ -282,17 +288,24 @@ impl Folder for ExpandAsyncFor {
     fn fold_expr(&mut self, expr: Expr) -> Expr {
         let expr = fold::noop_fold_expr(self, expr);
         if expr.attrs.len() != 1 {
-            return expr
+            return expr;
         }
         // TODO: more validation here
         if expr.attrs[0].path.segments.get(0).item().ident != "async" {
-            return expr
+            return expr;
         }
         let all = match expr.node {
             ExprKind::ForLoop(item) => item,
             _ => panic!("only for expressions can have #[async]"),
         };
-        let ExprForLoop { pat, expr, body, label, colon_token, .. } = all;
+        let ExprForLoop {
+            pat,
+            expr,
+            body,
+            label,
+            colon_token,
+            ..
+        } = all;
 
         // Basically just expand to a `poll` loop
         let tokens = quote! {{
@@ -332,14 +345,21 @@ impl Folder for ExpandAsyncFor {
 fn first_last(tokens: &ToTokens) -> (Span, Span) {
     let mut spans = Tokens::new();
     tokens.to_tokens(&mut spans);
-    let good_tokens = proc_macro2::TokenStream::from(spans).into_iter().collect::<Vec<_>>();
-    let first_span = good_tokens.first().map(|t| t.span).unwrap_or(Default::default());
+    let good_tokens = proc_macro2::TokenStream::from(spans)
+        .into_iter()
+        .collect::<Vec<_>>();
+    let first_span = good_tokens
+        .first()
+        .map(|t| t.span)
+        .unwrap_or(Default::default());
     let last_span = good_tokens.last().map(|t| t.span).unwrap_or(first_span);
     (first_span, last_span)
 }
 
-fn respan(input: proc_macro2::TokenStream,
-          &(first_span, last_span): &(Span, Span)) -> proc_macro2::TokenStream {
+fn respan(
+    input: proc_macro2::TokenStream,
+    &(first_span, last_span): &(Span, Span),
+) -> proc_macro2::TokenStream {
     let mut new_tokens = input.into_iter().collect::<Vec<_>>();
     if let Some(token) = new_tokens.first_mut() {
         token.span = first_span;
@@ -350,9 +370,7 @@ fn respan(input: proc_macro2::TokenStream,
     new_tokens.into_iter().collect()
 }
 
-fn replace_bang(input: proc_macro2::TokenStream, tokens: &ToTokens)
-    -> proc_macro2::TokenStream
-{
+fn replace_bang(input: proc_macro2::TokenStream, tokens: &ToTokens) -> proc_macro2::TokenStream {
     let mut new_tokens = Tokens::new();
     for token in input.into_iter() {
         match token.kind {

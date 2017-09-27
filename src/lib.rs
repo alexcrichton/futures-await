@@ -17,15 +17,16 @@
 #![feature(use_extern_macros)]
 #![feature(on_unimplemented)]
 
-extern crate futures_async_macro; // the compiler lies that this has no effect
-extern crate futures_await_macro;
 extern crate futures;
+extern crate futures_async_macro;
+// the compiler lies that this has no effect
+extern crate futures_await_macro;
 
 pub use futures::*;
 
 pub mod prelude {
-    pub use {Future, Stream, Sink, Poll, Async, AsyncSink, StartSend};
-    pub use {IntoFuture};
+    pub use {Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
+    pub use IntoFuture;
     pub use futures_async_macro::{async, async_block};
     pub use futures_await_macro::await;
 }
@@ -42,20 +43,22 @@ pub mod prelude {
 #[doc(hidden)]
 pub mod __rt {
     pub use std::boxed::Box;
-    pub use std::option::Option::{Some, None};
-    pub use std::result::Result::{Ok, Err, self};
+    pub use std::option::Option::{None, Some};
+    pub use std::result::Result::{self, Err, Ok};
     pub use std::ops::Generator;
 
     use futures::Poll;
-    use futures::{Future, Async};
+    use futures::{Async, Future};
     use std::ops::GeneratorState;
 
-    pub trait MyFuture<T: IsResult>: Future<Item=T::Ok, Error = T::Err> {}
+    pub trait MyFuture<T: IsResult>: Future<Item = T::Ok, Error = T::Err> {}
 
     impl<F, T> MyFuture<T> for F
-        where F: Future<Item = T::Ok, Error = T::Err > + ?Sized,
-              T: IsResult
-    {}
+    where
+        F: Future<Item = T::Ok, Error = T::Err> + ?Sized,
+        T: IsResult,
+    {
+    }
 
     #[rustc_on_unimplemented = "async functions must return a `Result` or \
                                 a typedef of `Result`"]
@@ -69,10 +72,14 @@ pub mod __rt {
         type Ok = T;
         type Err = E;
 
-        fn into_result(self) -> Result<Self::Ok, Self::Err> { self }
+        fn into_result(self) -> Result<Self::Ok, Self::Err> {
+            self
+        }
     }
 
-    pub fn diverge<T>() -> T { loop {} }
+    pub fn diverge<T>() -> T {
+        loop {}
+    }
 
     /// Small shim to translate from a generator to a future.
     ///
@@ -81,15 +88,17 @@ pub mod __rt {
     struct GenFuture<T>(T);
 
     pub fn gen<T>(gen: T) -> impl MyFuture<T::Return>
-        where T: Generator<Yield = ()>,
-              T::Return: IsResult,
+    where
+        T: Generator<Yield = ()>,
+        T::Return: IsResult,
     {
         GenFuture(gen)
     }
 
     impl<T> Future for GenFuture<T>
-        where T: Generator<Yield = ()>,
-              T::Return: IsResult,
+    where
+        T: Generator<Yield = ()>,
+        T::Return: IsResult,
     {
         type Item = <T::Return as IsResult>::Ok;
         type Error = <T::Return as IsResult>::Err;

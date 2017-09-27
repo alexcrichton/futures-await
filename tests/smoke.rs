@@ -17,7 +17,7 @@ fn foo() -> Result<i32, i32> {
 }
 
 #[async]
-extern fn _foo1() -> Result<i32, i32> {
+extern "C" fn _foo1() -> Result<i32, i32> {
     Ok(1)
 }
 
@@ -27,7 +27,7 @@ unsafe fn _foo2() -> io::Result<i32> {
 }
 
 #[async]
-unsafe extern fn _foo3() -> io::Result<i32> {
+unsafe extern "C" fn _foo3() -> io::Result<i32> {
     Ok(1)
 }
 
@@ -48,14 +48,15 @@ fn _foo6(ref a: i32) -> Result<i32, i32> {
 
 #[async]
 fn _foo7<T>(t: T) -> Result<T, i32>
-    where T: Clone + 'static,
+where
+    T: Clone + 'static,
 {
     Ok(t.clone())
 }
 
 #[async(boxed)]
 fn _foo8(a: i32, b: i32) -> Result<i32, i32> {
-    return Ok(a + b)
+    return Ok(a + b);
 }
 
 #[async]
@@ -136,6 +137,8 @@ fn loop_in_loop() -> Result<bool, i32> {
         }
     }
 
-    let sum = (1..5).map(|x| (1..5).map(|y| x * y).sum::<i32>()).sum::<i32>();
+    let sum = (1..5)
+        .map(|x| (1..5).map(|y| x * y).sum::<i32>())
+        .sum::<i32>();
     Ok(cnt == sum)
 }
