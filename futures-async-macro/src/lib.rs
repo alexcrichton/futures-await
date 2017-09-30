@@ -248,6 +248,99 @@ pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+pub fn async_closure(input: TokenStream) -> TokenStream {
+    let input = TokenStream::from(TokenTree {
+        kind: TokenNode::Group(Delimiter::Parenthesis, input),
+        span: Default::default(),
+    });
+    let paren_group: Expr = syn::parse(input)
+        .expect("failed to parse tokens as an expression");
+
+    let ExprParen {
+        expr,
+        ..
+    } = match paren_group.node {
+        ExprKind::Paren(expr) => expr,
+        _ => panic!("expected contents to be enclosed in parens")
+    };
+
+    let expr = *expr;
+    let Expr { node, .. } = expr;
+
+    let ExprClosure {
+        capture,
+        decl,
+        body,
+        ..
+    } = match node {
+        ExprKind::Closure(expr) => expr,
+        _ => panic!("async_closure! can only be applied to closures"),
+    };
+
+    let FnDecl {
+        inputs,
+        variadic,
+        ..
+    } = { *decl };
+    assert!(!variadic, "variadic functions cannot be async");
+
+    let block = match body.node {
+        ExprKind::Block(block) => block.block,
+        _ => panic!("body is not a block")
+    };
+
+    // This is the point where we handle
+    //
+    //      #[async]
+    //      for x in y {
+    //      }
+    //
+    // Basically just take all those expression and expand them.
+
+    let block = ExpandAsyncFor.fold_block(block);
+
+    let mut result = Tokens::new();
+    block.brace_token.surround(&mut result, |tokens| {
+        block.to_tokens(tokens);
+    });
+    syn::tokens::Semi([block.brace_token.0]).to_tokens(&mut result);
+
+    let gen_body_inner = quote! {
+        let __e: ::futures::__rt::Result<_,_> = #result
+
+        // Ensure that this closure is a generator, even if it doesn't
+        // have any `yield` statements.
+        #[allow(unreachable_code)]
+        {
+            return __e;
+            loop { yield }
+        }
+    };
+    let mut gen_body = Tokens::new();
+    block.brace_token.surround(&mut gen_body, |tokens| {
+        gen_body_inner.to_tokens(tokens);
+    });
+
+    // Give the invocation of the `gen` function the same span as the output
+    // as currently errors related to it being a result are targeted here. Not
+    // sure if more errors will highlight this function call...
+    let gen_function = quote! { ::futures::__rt::gen };
+    let body_inner = quote! {
+        #gen_function (move || #gen_body)
+    };
+
+    let mut body = Tokens::new();
+    block.brace_token.surround(&mut body, |tokens| {
+        body_inner.to_tokens(tokens);
+    });
+
+    let output = quote! {
+        #capture |#inputs| #body
+    };
+    output.into()
+}
+
+#[proc_macro]
 pub fn async_block(input: TokenStream) -> TokenStream {
     let input = TokenStream::from(TokenTree {
         kind: TokenNode::Group(Delimiter::Brace, input),
