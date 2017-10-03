@@ -139,3 +139,90 @@ fn loop_in_loop() -> Result<bool, i32> {
     let sum = (1..5).map(|x| (1..5).map(|y| x * y).sum::<i32>()).sum::<i32>();
     Ok(cnt == sum)
 }
+
+#[test]
+fn test_block_closure() {
+    let closure = async_closure!(
+        |x| {
+            match x {
+                1 => Ok(()),
+                _ => Err(1),
+            }
+        }
+    );
+
+    assert_eq!(closure(1).wait(), Ok(()))
+}
+
+#[test]
+fn test_capture() {
+    let x = 1;
+
+    let closure = async_closure!(
+        || {
+            match x {
+                1 => Ok(()),
+                _ => Err(1)
+            }
+        }
+    );
+
+    assert_eq!(closure().wait(), Ok(()))
+}
+
+#[test]
+fn test_move_capture() {
+    let s = "captured".to_string();
+
+    let closure = async_closure!(
+        move || {
+            if s == "captured" {
+                Ok(())
+            }
+            else {
+                Err(1)
+            }
+        }
+    );
+
+    assert_eq!(closure().wait(), Ok(()));
+}
+
+#[test]
+fn test_loop_in_closure() {
+    let closure = async_closure!(
+        || {
+            let mut cnt = 0;
+
+            #[async]
+            for x in futures::stream::iter_ok::<_, i32>(vec![1, 2, 3, 4]) {
+                cnt += x;
+            }
+
+            if cnt == 10 {
+                Ok(())
+            }
+            else {
+                Err(cnt)
+            }
+        }
+    );
+
+    assert_eq!(closure().wait(), Ok(()));
+}
+
+/* I wasn't able to figure out how to pass the closure's Expr body to the
+ *  ExpandAsyncFor Folder. I'm sure it's easy as hell, but I am very new to
+ *  proc_macros (and actually just macros in general).
+ */
+/*#[test]
+fn test_expr_closure() {
+    let closure = async_closure!(
+        |wha| match wha {
+            1 => Ok(()),
+            _ => Err(1),
+        }
+    );
+
+    assert_eq!(closure(1).wait(), Ok(()))
+}*/
