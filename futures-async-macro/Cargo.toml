@@ -12,9 +12,11 @@ proc-macro2 = { version = "0.1", features = ["unstable"] }
 
 [dependencies.syn]
 git = 'https://github.com/dtolnay/syn'
+rev = 'd5e985994ca58039ea22d6fde8acb821d9058f2f'
 features = ["full", "fold", "parsing", "printing"]
 default-features = false
 
 [dependencies.synom]
 git = 'https://github.com/dtolnay/syn'
+rev = 'd5e985994ca58039ea22d6fde8acb821d9058f2f'
 default-features = false
