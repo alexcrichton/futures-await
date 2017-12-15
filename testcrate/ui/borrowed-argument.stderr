@@ -7,7 +7,15 @@ error[E0597]: `a` does not live long enough
 17 | }
    | - borrowed value only lives until here
    |
-   = note: borrowed value must be valid for the static lifetime...
+note: borrowed value must be valid for the lifetime '__returned_future as defined on the function body at 13:1...
+  --> $DIR/borrowed-argument.rs:13:1
+   |
+13 | / fn foo(a: String) -> Result<i32, u32> {
+14 | |     await!(bar(&a))?;
+15 | |     drop(a);
+16 | |     Ok(1)
+17 | | }
+   | |_^
 
 error: aborting due to previous error
 

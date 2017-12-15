@@ -9,4 +9,9 @@ fn foo() -> Result<A, u32> {
     Err(3)
 }
 
+#[async(boxed)]
+fn foo_boxed() -> Result<A, u32> {
+    Err(3)
+}
+
 fn main() {}
