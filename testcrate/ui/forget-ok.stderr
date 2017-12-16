@@ -1,13 +1,23 @@
 error[E0308]: mismatched types
  --> $DIR/forget-ok.rs:8:28
   |
-8 |   fn foo() -> Result<(), ()> {
-  |  ____________________________^
-9 | | }
-  | |_^ expected enum `std::result::Result`, found ()
+8 | fn foo() -> Result<(), ()> {}
+  |                            ^^ expected enum `std::result::Result`, found ()
   |
   = note: expected type `std::result::Result<(), ()>`
              found type `()`
 
-error: aborting due to previous error
+error[E0308]: mismatched types
+  --> $DIR/forget-ok.rs:12:11
+   |
+12 |     yield 7;
+   |           ^
+   |           |
+   |           expected enum `std::result::Result`, found integral variable
+   |           help: try using a variant of the expected type: `Ok(7)`
+   |
+   = note: expected type `std::result::Result<u32, futures::__rt::StreamError<_>>`
+              found type `{integer}`
+
+error: aborting due to 2 previous errors
 

@@ -17,5 +17,24 @@ note: borrowed value must be valid for the lifetime '__returned_future as define
 17 | | }
    | |_^
 
-error: aborting due to previous error
+error[E0597]: `a` does not live long enough
+  --> $DIR/borrowed-argument.rs:21:37
+   |
+21 |     yield do catch { Ok(await!(bar(&a))?) };
+   |                                     ^ does not live long enough
+...
+24 | }
+   | - borrowed value only lives until here
+   |
+note: borrowed value must be valid for the lifetime '__returned_stream as defined on the function body at 20:1...
+  --> $DIR/borrowed-argument.rs:20:1
+   |
+20 | / fn foos(a: String) -> impl Stream<Item = i32, Error = u32> {
+21 | |     yield do catch { Ok(await!(bar(&a))?) };
+22 | |     drop(a);
+23 | |     yield Ok(5);
+24 | | }
+   | |_^
+
+error: aborting due to 2 previous errors
 
