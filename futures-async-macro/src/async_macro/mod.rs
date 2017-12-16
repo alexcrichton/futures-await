@@ -28,7 +28,12 @@ pub trait Mode: TypeAnn + Copy {
 
     /// parameter `for_boxed` is required to bypass bug described in
     /// module documentation of `ret_ty`.
-    fn mk_trait_to_return(self, for_boxed: bool, ret_ty: Type) -> TypeImplTrait;
+    fn mk_trait_to_return(
+        self,
+        for_boxed: bool,
+        brace_token: tokens::Brace,
+        ret_ty: Type,
+    ) -> TypeImplTrait;
 }
 
 #[derive(Copy, Clone)]
@@ -38,7 +43,12 @@ impl Mode for Future {
     const DEFAULT_LIFETIME: &'static str = "'__returned_future";
     const RT_GEN_FN_NAME: &'static str = "async_future";
 
-    fn mk_trait_to_return(self, for_boxed: bool, ret_ty: Type) -> TypeImplTrait {
+    fn mk_trait_to_return(
+        self,
+        for_boxed: bool,
+        brace_token: tokens::Brace,
+        ret_ty: Type,
+    ) -> TypeImplTrait {
         match ret_ty {
             Type::Path(..) => {
                 // Respanning makes error message for unresolved type worse.
@@ -66,8 +76,11 @@ impl Mode for Future {
                         .parse()
                 };
 
+
                 TypeImplTrait {
-                    impl_token: call_site(),
+                    // Span of `impl` token is used when bound has problems.
+                    // e.g. impl MyFuture<u32>
+                    impl_token: brace_token.0.as_token(),
                     bounds: vec![bound].into(),
                 }
             }
@@ -86,7 +99,12 @@ impl Mode for Stream {
     const DEFAULT_LIFETIME: &'static str = "'__returned_stream";
     const RT_GEN_FN_NAME: &'static str = "async_stream";
 
-    fn mk_trait_to_return(self, _for_boxed: bool, ret_ty: Type) -> TypeImplTrait {
+    fn mk_trait_to_return(
+        self,
+        _for_boxed: bool,
+        brace_token: tokens::Brace,
+        ret_ty: Type,
+    ) -> TypeImplTrait {
         // TODO(kdy): Better something something...
         match ret_ty {
             Type::ImplTrait(t) => return t,
@@ -142,10 +160,10 @@ pub fn expand_async_fn<M: Mode>(mode: M, attr: TokenStream, function: TokenStrea
 pub fn expand_async_block<M: Mode>(mode: M, block: Block, output_ty: Option<Type>) -> Block {
     /// Make function body into `__rt::gen(|| { #body })`.
     fn call_rt_gen<M: Mode>(mode: M, block: Block, ret_ty: Option<Type>) -> Block {
-        let span = block.brace_token.0;
+        let brace_token = block.brace_token;
         let gen_function = Term::intern(M::RT_GEN_FN_NAME);
 
-        let gen_function = Quote::from_tokens_or(&ret_ty, Span::call_site())
+        let gen_function = Quote::from_tokens_or(&ret_ty, (brace_token.0).0)
             .quote_with(smart_quote!(
                 Vars { gen_function },
                 { futures_await::__rt::gen_function }
@@ -158,9 +176,9 @@ pub fn expand_async_block<M: Mode>(mode: M, block: Block, output_ty: Option<Type
         //     #block
         // }
         let gen_closure = Expr::from(ExprKind::from(ExprClosure {
-            capture: CaptureBy::Value(span.as_token()),
-            or1_token: span.as_token(),
-            or2_token: span.as_token(),
+            capture: CaptureBy::Value(brace_token.0.as_token()),
+            or1_token: brace_token.0.as_token(),
+            or2_token: brace_token.0.as_token(),
 
             decl: box FnDecl {
                 output: ReturnType::Default,
@@ -175,9 +193,9 @@ pub fn expand_async_block<M: Mode>(mode: M, block: Block, output_ty: Option<Type
             },
             body: box Expr::from(ExprKind::from(ExprBlock {
                 block: Block {
-                    brace_token: span.as_token(),
+                    brace_token,
                     stmts: vec![
-                        type_ann::make_type_annotations(mode, ret_ty),
+                        type_ann::make_type_annotations(mode, brace_token, ret_ty),
                         Stmt::Expr(box ExprKind::from(ExprBlock { block }).into()),
                     ],
                 },
@@ -185,7 +203,7 @@ pub fn expand_async_block<M: Mode>(mode: M, block: Block, output_ty: Option<Type
         }));
 
         Block {
-            brace_token: span.as_token(),
+            brace_token,
             stmts: vec![
                 //
                 // call ::futures_await::__rt::async_future
@@ -195,7 +213,7 @@ pub fn expand_async_block<M: Mode>(mode: M, block: Block, output_ty: Option<Type
                         path: gen_function,
                     })),
                     args: vec![(gen_closure, None)].into(),
-                    paren_token: span.as_token(),
+                    paren_token: brace_token.0.as_token(),
                 }).into()),
             ],
         }
@@ -240,28 +258,30 @@ impl<M: Mode> Expander<M> {
     ///
     ///
     fn handle_boxed_body(self, block: Block) -> Block {
-        match self.boxed {
-            Some(boxed_span) => {
-                let box_fn_path = ExprKind::from(ExprPath {
-                    qself: None,
-                    path: Quote::new(boxed_span)
-                        .quote_with(smart_quote!(Vars {}, { futures_await::__rt::Box::new }))
-                        .parse(),
-                }).into();
+        // Span of #[async(boxed)]
+        let boxed = match self.boxed {
+            Some(boxed) => boxed,
+            None => return block,
+        };
 
-                let box_stmt = Stmt::Expr(box Expr::from(ExprKind::from(ExprCall {
-                    func: box box_fn_path,
+        // This span is used when function body (= block)
+        // returns other than return type.
+        let brace_token = block.brace_token;
 
-                    args: vec![Expr::from(ExprKind::from(ExprBlock { block }))].into(),
-                    paren_token: boxed_span.as_token(),
-                })));
+        let box_fn_path = Quote::new(boxed)
+            .quote_with(smart_quote!(Vars {}, { futures_await::__rt::Box::new }))
+            .parse();
 
-                Block {
-                    brace_token: boxed_span.as_token(),
-                    stmts: vec![box_stmt],
-                }
-            }
-            None => block,
+        let box_stmt = Stmt::Expr(box Expr::from(ExprKind::from(ExprCall {
+            func: box box_fn_path,
+
+            args: vec![Expr::from(ExprKind::from(ExprBlock { block }))].into(),
+            paren_token: boxed.as_token(),
+        })));
+
+        Block {
+            brace_token,
+            stmts: vec![box_stmt],
         }
     }
 }

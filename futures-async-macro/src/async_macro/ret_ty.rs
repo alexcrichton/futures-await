@@ -19,14 +19,14 @@ use util::{call_site, ElementExt};
 impl<M: Mode> Expander<M> {
     pub(super) fn handle_ret_ty(self, f: ItemFn) -> ItemFn {
         let decl = *f.decl;
-
+        let brace_token = f.block.brace_token;
 
 
         ItemFn {
             decl: Some(decl)
                 .map(|decl| {
                     FnDecl {
-                        output: self.ret_ty_to_impl_trait(decl.output),
+                        output: self.ret_ty_to_impl_trait(decl.output, brace_token),
                         ..decl
                     }
                 })
@@ -43,11 +43,12 @@ impl<M: Mode> Expander<M> {
     }
 
     /// Step 1. Make return type to impl trait.
-    fn ret_ty_to_impl_trait(self, ty: ReturnType) -> ReturnType {
+    fn ret_ty_to_impl_trait(self, ty: ReturnType, brace_token: tokens::Brace) -> ReturnType {
         match ty {
             ReturnType::Default => panic!("#[async] function should return something"),
             ReturnType::Type(ty, rarrow) => {
-                let ty = self.mode.mk_trait_to_return(self.boxed.is_some(), ty);
+                let ty = self.mode
+                    .mk_trait_to_return(self.boxed.is_some(), brace_token, ty);
 
 
 

@@ -89,7 +89,7 @@ pub mod __rt {
     /// the futures protocol.
     struct GenFut<G>(G);
 
-    pub fn async_future<'a, G, T, E>(gen: G) -> impl 'a + Future<Item = T, Error = E>
+    pub fn async_future<'a, G, T, E>(gen: G) -> impl 'a + MyFuture<Result<T, E>>
     where
         G: 'a + Generator<Yield = (), Return = Result<T, E>>,
     {

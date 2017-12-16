@@ -34,16 +34,17 @@ use util::call_site;
 pub trait TypeAnn {
     /// Create type annotation statements for yield and return.
     ///
+    /// brace_token is required because MyFuture<Result<_, _>> is used in type position.
     ///
     ///
     /// FIXME: Use None to report error when #[async] function
     ///         does not return anything.
-    fn mk_type_annotations(self, output: Option<Type>) -> Vec<Expr>;
+    fn mk_type_annotations(self, brace_token: tokens::Brace, output: Option<Type>) -> Vec<Expr>;
 }
 
 
 impl TypeAnn for Future {
-    fn mk_type_annotations(self, output: Option<Type>) -> Vec<Expr> {
+    fn mk_type_annotations(self, brace_token: tokens::Brace, output: Option<Type>) -> Vec<Expr> {
         let yield_ann: Expr = Quote::new_call_site()
             .quote_with(smart_quote!(Vars {}, { yield }))
             .parse();
@@ -55,7 +56,7 @@ impl TypeAnn for Future {
             expr: Some(box make_expr_with_ty(
                 // Span for this is important when return "value"
                 //  (in function body) is not a result.
-                Quote::from_tokens_or(&output, Span::call_site())
+                Quote::from_tokens_or(&output, brace_token.0.as_token())
                     .quote_with(smart_quote!(Vars {}, (futures_await::__rt::Result<_, _>)))
                     .parse(),
             )),
@@ -82,7 +83,7 @@ impl TypeAnn for Future {
 }
 
 impl TypeAnn for Stream {
-    fn mk_type_annotations(self, output: Option<Type>) -> Vec<Expr> {
+    fn mk_type_annotations(self, brace_token: tokens::Brace, output: Option<Type>) -> Vec<Expr> {
         // FIXME: Should handle trait object with multiple bounds.
         let b = match output {
             Some(Type::ImplTrait(ref b)) => b.bounds
@@ -152,11 +153,15 @@ impl TypeAnn for Stream {
 /// }
 ///```
 ///
-pub fn make_type_annotations<M: Mode>(mode: M, output: Option<Type>) -> Stmt {
+pub fn make_type_annotations<M: Mode>(
+    mode: M,
+    brace_token: tokens::Brace,
+    output: Option<Type>,
+) -> Stmt {
     wrap_in_unreacable_block(
-        mode.mk_type_annotations(output)
+        mode.mk_type_annotations(brace_token, output)
             .into_iter()
-            .map(|e| Stmt::Semi(box e, call_site()))
+            .map(|e| Stmt::Semi(box e, Span::call_site().as_token()))
             .collect(),
     )
 }
@@ -173,48 +178,14 @@ pub fn make_type_annotations<M: Mode>(mode: M, output: Option<Type>) -> Stmt {
 ///```
 ///
 fn make_expr_with_ty(ty: Type) -> Expr {
-    let span = Span::call_site();
-
-
-    ExprKind::Block(ExprBlock {
-        block: Block {
-            brace_token: span.as_token(),
-            stmts: vec![
-                Stmt::Local(box Local {
-                    ty: Some(box ty),
-                    attrs: Default::default(),
-                    colon_token: Some(span.as_token()),
-                    let_token: span.as_token(),
-                    eq_token: Some(span.as_token()),
-                    semi_token: span.as_token(),
-                    pat: box PatIdent {
-                        ident: span.new_ident("_v"),
-                        mode: BindingMode::ByValue(Mutability::Immutable),
-                        subpat: None,
-                        at_token: None,
-                    }.into(),
-                    init: Some(box ExprKind::Macro(Macro {
-                        path: span.new_ident("unreachable").into(),
-                        bang_token: span.as_token(),
-                        // maybe more helpful message?
-                        tokens: vec![
-                            TokenTree(proc_macro2::TokenTree {
-                                span: span,
-                                kind: TokenNode::Group(
-                                    Delimiter::Parenthesis,
-                                    TokenStream::empty(),
-                                ),
-                            }),
-                        ],
-                    }).into()),
-                }),
-                Stmt::Expr(box ExprKind::Path(ExprPath {
-                    qself: None,
-                    path: span.new_ident("_v").into(),
-                }).into()),
-            ],
-        },
-    }).into()
+    Quote::from_tokens(&ty)
+        .quote_with(smart_quote!(Vars { Type: ty }, {
+            {
+                let _v: Type = unreachable!();
+                _v
+            }
+        }))
+        .parse()
 }
 
 ///
