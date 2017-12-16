@@ -7,14 +7,6 @@ error[E0412]: cannot find type `A` in this scope
   = help: there is an enum variant `futures::future::Either::A`, try using `futures::future::Either`?
 
 error[E0412]: cannot find type `A` in this scope
- --> $DIR/unresolved-type.rs:8:20
-  |
-8 | fn foo() -> Result<A, u32> {
-  |                    ^ not found in this scope
-  |
-  = help: there is an enum variant `futures::future::Either::A`, try using `futures::future::Either`?
-
-error[E0412]: cannot find type `A` in this scope
   --> $DIR/unresolved-type.rs:13:26
    |
 13 | fn foo_boxed() -> Result<A, u32> {
@@ -23,20 +15,20 @@ error[E0412]: cannot find type `A` in this scope
    = help: there is an enum variant `futures::future::Either::A`, try using `futures::future::Either`?
 
 error[E0412]: cannot find type `A` in this scope
-  --> $DIR/unresolved-type.rs:13:26
+  --> $DIR/unresolved-type.rs:18:39
    |
-13 | fn foo_boxed() -> Result<A, u32> {
-   |                          ^ not found in this scope
+18 | fn foo_stream() -> impl Stream<Item = A, Error = u32> {
+   |                                       ^ not found in this scope
    |
    = help: there is an enum variant `futures::future::Either::A`, try using `futures::future::Either`?
 
 error[E0412]: cannot find type `A` in this scope
-  --> $DIR/unresolved-type.rs:13:26
+  --> $DIR/unresolved-type.rs:23:45
    |
-13 | fn foo_boxed() -> Result<A, u32> {
-   |                          ^ not found in this scope
+23 | fn foo_stream_boxed() -> impl Stream<Item = A, Error = u32> {
+   |                                             ^ not found in this scope
    |
    = help: there is an enum variant `futures::future::Either::A`, try using `futures::future::Either`?
 
-error: aborting due to 5 previous errors
+error: aborting due to 11 previous errors
 

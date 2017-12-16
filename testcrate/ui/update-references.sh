@@ -21,8 +21,7 @@
 
 MYDIR=$(dirname $0)
 
-TARGET_DIR=$(cargo metadata --format-version 1 --no-deps  | jq -r '.target_directory' )
-BUILD_DIR="$TARGET_DIR/tests/ui"
+BUILD_DIR="../../target/tests/ui"
 
 while [[ "$1" != "" ]]; do
     STDERR_NAME="${1/%.rs/.stderr}"
@@ -39,5 +38,3 @@ while [[ "$1" != "" ]]; do
         cp $BUILD_DIR/$STDERR_NAME $MYDIR/$STDERR_NAME
     fi
 done
-
-
