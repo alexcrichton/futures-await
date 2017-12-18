@@ -1,0 +1,24 @@
+error[E0277]: futures-await: generic error type cannot yielded directly
+  --> $DIR/stream-generic-error.rs:22:9
+   |
+22 |         Err(a)?;
+   |         ^^^^^^^ 
+                           due to lack of negative constraint in rust trait system,
+                           type `A` cannot be yielded as an error directly.
+
+                           try result.map_err(YourError::from)
+                           e.g.
+                                yield do catch { Ok(await!(future).map_err(GenericError::from)?) }
+                           instead of
+                                yield do catch { Ok(await!(future)?) }
+   |
+   = help: within `futures::__rt::Value<A, futures::__rt::StreamError<Error<A>>>`, the trait `futures::__rt::NotEq` is not implemented for `A`
+   = help: consider adding a `where A: futures::__rt::NotEq` bound
+   = note: required because it appears within the type `(A, futures::__rt::StreamError<Error<A>>)`
+   = note: required because it appears within the type `std::marker::PhantomData<(A, futures::__rt::StreamError<Error<A>>)>`
+   = note: required because it appears within the type `futures::__rt::Value<A, futures::__rt::StreamError<Error<A>>>`
+   = note: required because of the requirements on the impl of `std::convert::From<A>` for `futures::__rt::StreamError<Error<A>>`
+   = note: required by `std::convert::From::from`
+
+error: aborting due to previous error
+

@@ -15,6 +15,7 @@
 #![feature(conservative_impl_trait)]
 #![feature(generator_trait)]
 #![feature(use_extern_macros)]
+#![feature(attr_literals)]
 #![feature(on_unimplemented)]
 #![feature(optin_builtin_traits)]
 
@@ -139,6 +140,7 @@ pub mod __rt {
         }
     }
 
+
     /// Auto trait used to implement
     ///  generic From<T> for StreamError<E> where T: Into<E>
     ///
@@ -148,21 +150,64 @@ pub mod __rt {
     impl UserProvidedError for ..{}
     impl<E> !UserProvidedError for StreamError<E> {}
 
+
+
+    pub struct Value<A, B>(::std::marker::PhantomData<(A, B)>);
+    // TODO: Don't show this message if From<T> is not implemented for E
+    #[rustc_on_unimplemented(message = "futures-await: generic error type cannot yielded directly",
+                             label = "
+                           due to lack of negative constraint in rust trait system,
+                           type `{Self}` cannot be yielded as an error directly.
+
+                           try result.map_err(YourError::from)
+                           e.g.
+                                yield do catch {{ Ok(await!(future).map_err(GenericError::from)?) }}
+                           instead of
+                                yield do catch {{ Ok(await!(future)?) }}")]
+    pub trait NotEq {}
+    #[allow(auto_impl)]
+    impl NotEq for .. {}
+    impl<A> !NotEq for Value<A, A> {}
+
     pub struct StreamError<E>(StreamErrorInner<E>);
+
+
+
+
+    impl<E> From<E> for StreamError<E> {
+        fn from(e: E) -> Self {
+            StreamError(StreamErrorInner::Error(e))
+        }
+    }
+
 
     impl<E, T> From<T> for StreamError<E>
     where
-        T: Into<E> + UserProvidedError,
+        T: Into<E>,
+        Value<T, Self>: NotEq,
+        Value<T, E>: NotEq,
     {
         fn from(err: T) -> Self {
             StreamError(StreamErrorInner::Error(err.into()))
         }
     }
 
+
+    // impl<E, T> From<T> for StreamError<E>
+    // where
+    //     T: UserProvidedError + Into<E>,
+    // {
+    //     fn from(err: T) -> Self {
+    //         StreamError(StreamErrorInner::Error(err.into()))
+    //     }
+    // }
+
     enum StreamErrorInner<E> {
         Error(E),
         NotReady,
     }
+
+
 
     pub trait YieldType {
         fn not_ready() -> Self;

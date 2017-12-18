@@ -59,8 +59,6 @@ impl From<ErrFromWrppaedLib> for OtherWrapper {
     }
 }
 
-
-
 fn foo() -> Result<(), FooError> {
     Err(FooError)
 }

@@ -1,0 +1,20 @@
+error[E0277]: the trait bound `E: std::convert::From<()>` is not satisfied
+  --> $DIR/error-from-not-implemented.rs:11:8
+   |
+11 |     Ok(res?)
+   |        ^^^^ the trait `std::convert::From<()>` is not implemented for `E`
+   |
+   = note: required by `std::convert::From::from`
+
+error[E0277]: the trait bound `E: std::convert::From<()>` is not satisfied
+  --> $DIR/error-from-not-implemented.rs:17:9
+   |
+17 |         res?;
+   |         ^^^^ the trait `std::convert::From<()>` is not implemented for `E`
+   |
+   = note: required because of the requirements on the impl of `std::convert::Into<E>` for `()`
+   = note: required because of the requirements on the impl of `std::convert::From<()>` for `futures::__rt::StreamError<E>`
+   = note: required by `std::convert::From::from`
+
+error: aborting due to 2 previous errors
+

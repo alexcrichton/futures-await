@@ -16,7 +16,7 @@ error[E0308]: mismatched types
    |           expected enum `std::result::Result`, found integral variable
    |           help: try using a variant of the expected type: `Ok(7)`
    |
-   = note: expected type `std::result::Result<u32, futures::__rt::StreamError<_>>`
+   = note: expected type `std::result::Result<u32, futures::__rt::StreamError<()>>`
               found type `{integer}`
 
 error: aborting due to 2 previous errors
