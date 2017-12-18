@@ -14,18 +14,20 @@ impl Folder for ExpandAwait {
     fn fold_block(&mut self, mut block: Block) -> Block {
         let len = block.stmts.len();
         if len == 0 {
-            //TODO(kdy): invoke compile_error!() with span of block.
-            unimplemented!("await!: Reporting error for empty block.")
+            return expand_await_block(block_to_expr(block));
         }
 
-        let last = match block.stmts.remove(len - 1) {
-            Stmt::Local(..) | Stmt::Item(..) | Stmt::Semi(..) => {
-                unimplemented!("await!: Reporting error for non-expression statement.")
-            }
+        let last = block.stmts.remove(len - 1);
+        let last = match last {
             // if it's last statement and we're in return expression,
             // await! it.
             Stmt::Expr(expr) => Stmt::Expr(box self.fold_expr(*expr)),
-            Stmt::Macro(..) => unimplemented!("await!: Awaiting macro invocation"),
+
+            _ => {
+                // Use type system for error reporting.
+                block.stmts.push(last);
+                return expand_await_block(block_to_expr(block));
+            }
         };
         block.stmts.push(last);
 
@@ -71,9 +73,7 @@ impl Folder for ExpandAwait {
                 }),
 
                 // TODO?
-                ForLoop(..) | Loop(..) | While(..) | WhileLet(..) => return mk_await(expr),
-
-                _ => return mk_await(expr),
+                _ => return block_to_expr(expand_await_block(expr)),
             },
             ..expr
         }
@@ -92,29 +92,33 @@ impl Folder for ExpandAwait {
 
 /// Make expanded version of `await!(expr)` with appropriate span.
 ///
-fn mk_await(expr: Expr) -> Expr {
+fn expand_await_block(expr: Expr) -> Block {
     // Long names help debugging type inference failure.
 
-    return Quote::new_call_site()
+    return Quote::from_tokens(&expr)
         .quote_with(smart_quote!(Vars { fut_expr: expr }, {
             {
-                let mut future_in_await = { fut_expr };
+                let mut future_in_await = fut_expr;
 
                 loop {
-                    extern crate futures_await;
+                    extern crate futures_await as _futures_await;
 
-                    match futures_await::Future::poll(&mut future_in_await) {
-                        futures_await::__rt::Ok(futures_await::Async::Ready(await_ok)) => {
-                            break futures_await::__rt::Ok(await_ok);
+                    match _futures_await::Future::poll(&mut future_in_await) {
+                        _futures_await::__rt::Ok(_futures_await::Async::Ready(await_ok)) => {
+                            break _futures_await::__rt::Ok(await_ok);
                         }
-                        futures_await::__rt::Ok(futures_await::Async::NotReady) => {}
-                        futures_await::__rt::Err(await_err) => {
-                            break futures_await::__rt::Err(await_err);
+                        _futures_await::__rt::Ok(_futures_await::Async::NotReady) => {}
+                        _futures_await::__rt::Err(await_err) => {
+                            break _futures_await::__rt::Err(await_err);
                         }
                     }
-                    yield futures_await::__rt::YieldType::not_ready();
+                    yield _futures_await::__rt::YieldType::not_ready();
                 }
             }
         }))
         .parse();
+}
+
+fn block_to_expr(block: Block) -> Expr {
+    Expr::from(ExprKind::Block(ExprBlock { block }))
 }

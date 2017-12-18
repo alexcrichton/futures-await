@@ -1,0 +1,21 @@
+error[E0277]: the trait bound `(): futures::Future` is not satisfied
+ --> $DIR/bad-await.rs:9:12
+  |
+9 |     await!({})
+  |            ^^ the trait `futures::Future` is not implemented for `()`
+  |
+  = note: required by `futures::Future::poll`
+
+error[E0277]: the trait bound `(): futures::Future` is not satisfied
+  --> $DIR/bad-await.rs:14:12
+   |
+14 |       await!({
+   |  ____________^
+15 | |         struct S {}
+16 | |     })
+   | |_____^ the trait `futures::Future` is not implemented for `()`
+   |
+   = note: required by `futures::Future::poll`
+
+error: aborting due to 2 previous errors
+
