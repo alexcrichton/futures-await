@@ -25,7 +25,7 @@
 ///
 use super::{Future, Mode, Stream};
 use pmutil::prelude::*;
-use proc_macro2::{self, Delimiter, Span, TokenNode, TokenStream};
+use proc_macro2::Span;
 use quote::{ToTokens, Tokens};
 use std::iter;
 use syn::*;
@@ -83,7 +83,7 @@ impl TypeAnn for Future {
 }
 
 impl TypeAnn for Stream {
-    fn mk_type_annotations(self, brace_token: tokens::Brace, output: Option<Type>) -> Vec<Expr> {
+    fn mk_type_annotations(self, _brace_token: tokens::Brace, output: Option<Type>) -> Vec<Expr> {
         // FIXME: Should handle trait object with multiple bounds.
         let b = match output {
             Some(Type::ImplTrait(ref b)) => b.bounds

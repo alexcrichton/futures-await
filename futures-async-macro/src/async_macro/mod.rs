@@ -5,7 +5,7 @@ use proc_macro2::{self, Span, Term};
 use quote::ToTokens;
 use syn::*;
 use syn::fold::Folder;
-use util::{self, call_site};
+use util;
 
 mod type_ann;
 mod for_loop;
@@ -102,7 +102,7 @@ impl Mode for Stream {
     fn mk_trait_to_return(
         self,
         _for_boxed: bool,
-        brace_token: tokens::Brace,
+        _brace_token: tokens::Brace,
         ret_ty: Type,
     ) -> TypeImplTrait {
         // TODO(kdy): Better something something...
@@ -110,7 +110,7 @@ impl Mode for Stream {
             Type::ImplTrait(t) => return t,
             _ => {}
         }
-        unimplemented!("mk_trait_to_return for #[async_stream]")
+        unimplemented!("return type except impl Stream<> for #[async_stream]")
     }
 }
 

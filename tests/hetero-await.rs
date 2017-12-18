@@ -6,6 +6,13 @@ extern crate futures_await as futures;
 use futures::future::lazy;
 use futures::prelude::*;
 
+#[test]
+fn test_block() {
+    assert_eq!(block(true).wait(), Ok(2));
+    assert_eq!(block(false).wait(), Ok(0));
+    assert_eq!(boxed_block(true).wait(), Ok(2));
+    assert_eq!(boxed_block(false).wait(), Ok(0));
+}
 
 #[async]
 fn block(cond: bool) -> Result<i32, i32> {
