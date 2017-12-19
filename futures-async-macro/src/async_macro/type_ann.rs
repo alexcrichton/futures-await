@@ -29,113 +29,134 @@ use proc_macro2::Span;
 use quote::{ToTokens, Tokens};
 use std::iter;
 use syn::*;
-use util::call_site;
 
 pub trait TypeAnn {
     /// Create type annotation statements for yield and return.
     ///
     /// brace_token is required because MyFuture<Result<_, _>> is used in type position.
     ///
+    /// `return_type` is None for async_block! and async_stream_block!.
     ///
     /// FIXME: Use None to report error when #[async] function
     ///         does not return anything.
-    fn mk_type_annotations(self, brace_token: tokens::Brace, output: Option<Type>) -> Vec<Expr>;
+    fn mk_type_annotations(
+        self,
+        brace_token: tokens::Brace,
+        return_type: Option<Type>,
+    ) -> Vec<Expr>;
 }
 
 
 impl TypeAnn for Future {
-    fn mk_type_annotations(self, brace_token: tokens::Brace, output: Option<Type>) -> Vec<Expr> {
-        let yield_ann: Expr = Quote::new_call_site()
-            .quote_with(smart_quote!(Vars {}, { yield }))
-            .parse();
+    fn mk_type_annotations(
+        self,
+        brace_token: tokens::Brace,
+        return_type: Option<Type>,
+    ) -> Vec<Expr> {
+        iter::once({
+            // yield;
+            make_yield_expr(None)
+        }).chain(iter::once({
+            // return Result<_, _>;
+            // Useful when function returns non-result type.
+            let result_type = Quote::from_tokens_or(&return_type, brace_token.0.as_token())
+                .quote_with(smart_quote!(Vars {}, (futures_await::__rt::Result<_, _>)))
+                .parse();
 
-
-        // Return type is Result<_, _>
-        // Useful when function returns non-result type.
-        let ret_res = ExprKind::Ret(ExprRet {
-            expr: Some(box make_expr_with_ty(
-                // Span for this is important when return "value"
-                //  (in function body) is not a result.
-                Quote::from_tokens_or(&output, brace_token.0.as_token())
-                    .quote_with(smart_quote!(Vars {}, (futures_await::__rt::Result<_, _>)))
-                    .parse(),
-            )),
-            return_token: call_site(),
-        }).into();
-
-        // Annotate exact return type if available.
-        let ret_exact = output
-            .map(make_expr_with_ty)
-            .map(|e| {
-                ExprRet {
-                    expr: Some(box e),
-                    return_token: call_site(),
-                }
+            make_return_expr(Some(make_expr_with_type(result_type)))
+        }))
+            .chain({
+                // Annotate exact return type if available.
+                return_type
+                    .map(make_expr_with_type)
+                    .map(Some)
+                    .map(make_return_expr)
             })
-            .map(ExprKind::from)
-            .map(Expr::from);
-
-        iter::once(yield_ann)
-            .chain(iter::once(ret_res))
-            .chain(ret_exact)
             .collect()
     }
 }
 
 impl TypeAnn for Stream {
-    fn mk_type_annotations(self, _brace_token: tokens::Brace, output: Option<Type>) -> Vec<Expr> {
+    fn mk_type_annotations(
+        self,
+        brace_token: tokens::Brace,
+        return_type: Option<Type>,
+    ) -> Vec<Expr> {
         // FIXME: Should handle trait object with multiple bounds.
-        let b = match output {
-            Some(Type::ImplTrait(ref b)) => b.bounds
-                .iter()
-                .filter_map(|bound| {
-                    // Extract `Stream<Item = T, Error = E>` from impl Stream<...>
-                    match **bound.item() {
-                        TypeParamBound::Trait(ref poly, ..) => Some(poly),
-                        _ => None,
-                    }
+
+
+        let bounds = return_type.as_ref().map(|t| {
+            match *t {
+                Type::ImplTrait(ref b) => b.bounds
+                    .iter()
+                    .filter_map(|bound| {
+                        // Extract `Stream<Item = T, Error = E>` from impl Stream<...>
+                        match **bound.item() {
+                            TypeParamBound::Trait(ref poly, ..) => Some(poly),
+                            _ => None,
+                        }
+                    })
+                    .next()
+                    .expect("#[async_stream]: expected impl Stream for return type"),
+                _ => unimplemented!(
+                    "#[async_stream] currently only suports 'impl Stream' for return type"
+                ),
+            }
+        });
+
+
+        iter::once(
+            // yield Result<_, _>;
+            {
+                let result_type = Quote::from_tokens_or(&return_type, brace_token.0.as_token())
+                    .quote_with(smart_quote!(Vars {}, (futures_await::__rt::Result<_, _>)))
+                    .parse();
+                make_yield_expr(Some(make_expr_with_type(result_type)))
+            },
+        ).chain({
+            // Exact type for O in Result<O, E>
+            bounds.map(|bounds| {
+                let ok_type = Quote::from_tokens(&bounds)
+                    .quote_with(smart_quote!(Vars { Bounds: bounds }, {
+                        <Bounds as futures_await::stream::Stream>::Item
+                    }))
+                    .parse();
+                let expr = make_expr_with_type(ok_type);
+
+                Quote::from_tokens(&bounds)
+                    .quote_with(smart_quote!(
+                        Vars { expr },
+                        { yield futures_await::__rt::Ok(expr) }
+                    ))
+                    .parse()
+            })
+        })
+            .chain({
+                // Exact type for E in Result<O, E>
+                bounds.map(|bounds| {
+                    Quote::from_tokens(&bounds)
+                        .quote_with({
+                            let stream_error_type = Quote::from_tokens(&return_type)
+                                .quote_with(smart_quote!(Vars { Bounds: bounds }, {
+                                    <Bounds as futures_await::stream::Stream>::Error
+                                }))
+                                .parse();
+
+                            let expr = make_expr_with_type(stream_error_type);
+                            smart_quote!(Vars { expr }, {
+                                yield futures_await::__rt::Err(
+                                    futures_await::__rt::StreamError::from(expr),
+                                )
+                            })
+                        })
+                        .parse()
                 })
-                .next()
-                .expect("#[async_stream]: expected impl Stream for return type"),
-            _ => unimplemented!(
-                "#[async_stream] currently only suports 'impl Stream' for return type"
-            ),
-        };
-
-        let ok_ty = make_expr_with_ty(
-            Quote::new_call_site()
-                .quote_with(smart_quote!(Vars { Bounds: b }, {
-                    <Bounds as futures_await::stream::Stream>::Item
-                }))
-                .parse(),
-        );
-
-        let err_ty = make_expr_with_ty(
-            Quote::new_call_site()
-                .quote_with(smart_quote!(Vars { Bounds: b }, {
-                    <Bounds as futures_await::stream::Stream>::Error
-                }))
-                .parse(),
-        );
-
-        vec![
-            Quote::new_call_site()
-                .quote_with(smart_quote!(
-                    Vars { ok_ty },
-                    { yield futures_await::__rt::Ok(ok_ty) }
-                ))
-                .parse(),
-            Quote::new_call_site()
-                .quote_with(smart_quote!(Vars { err_ty }, {
-                    yield futures_await::__rt::Err(futures_await::__rt::StreamError::from(err_ty))
-                }))
-                .parse(),
-            // return type is ()
-            ExprKind::Ret(ExprRet {
-                expr: None,
-                return_token: call_site(),
-            }).into(),
-        ]
+            })
+            .chain({
+                // return;
+                iter::once(make_return_expr(None))
+            })
+            .collect()
     }
 }
 
@@ -177,7 +198,7 @@ pub fn make_type_annotations<M: Mode>(
 /// }
 ///```
 ///
-fn make_expr_with_ty(ty: Type) -> Expr {
+fn make_expr_with_type(ty: Type) -> Expr {
     Quote::from_tokens(&ty)
         .quote_with(smart_quote!(Vars { Type: ty }, {
             {
@@ -186,6 +207,20 @@ fn make_expr_with_ty(ty: Type) -> Expr {
             }
         }))
         .parse()
+}
+
+fn make_yield_expr(expr: Option<Expr>) -> Expr {
+    ExprKind::Yield(ExprYield {
+        yield_token: Span::call_site().as_token(),
+        expr: expr.map(Box::new),
+    }).into()
+}
+
+fn make_return_expr(expr: Option<Expr>) -> Expr {
+    ExprKind::Ret(ExprRet {
+        return_token: Span::call_site().as_token(),
+        expr: expr.map(Box::new),
+    }).into()
 }
 
 ///
