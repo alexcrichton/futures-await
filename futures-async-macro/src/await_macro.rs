@@ -3,7 +3,6 @@
 use pmutil::prelude::*;
 use syn::*;
 use syn::fold::Folder;
-use util::quoter_from_tokens;
 
 
 /// Yield-to-poll converter

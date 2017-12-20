@@ -46,8 +46,17 @@ pub mod prelude {
 /// your code to be stable.
 #[doc(hidden)]
 pub mod __rt {
-    /// rustc 1.24.0-nightly (73bca2b9f 2017-11-28) doesn't show
-    ///     std if it's module or type is pub used.
+    /// Workaround for regression from
+    ///
+    /// rustc 1.24.0-nightly (73bca2b9f 2017-11-28)
+    /// (rustup = nightly-2017-11-29-x86_64-unknown-linux-gnu)
+    ///
+    /// to
+    /// rustc 1.24.0-nightly (dc39c3169 2017-12-17)
+    ///
+    //
+    ///  If an item is pub used, it creates a
+    ///    new item instead of being alias of original item.
     pub extern crate std;
     pub use std::ops::Generator;
 
