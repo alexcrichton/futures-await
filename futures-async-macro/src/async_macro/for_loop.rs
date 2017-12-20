@@ -36,8 +36,8 @@ impl Folder for ExpandAsyncFor {
                         let r = futures_await::Stream::poll(&mut __stream)?;
                         match r {
                             futures_await::Async::Ready(e) => match e {
-                                futures_await::__rt::Some(e) => e,
-                                futures_await::__rt::None => break,
+                                futures_await::__rt::std::option::Option::Some(e) => e,
+                                futures_await::__rt::std::option::Option::None => break,
                             },
                             futures_await::Async::NotReady => {
                                 yield futures_await::__rt::YieldType::not_ready();

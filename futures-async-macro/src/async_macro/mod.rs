@@ -279,7 +279,10 @@ impl<M: Mode> Expander<M> {
         let brace_token = block.brace_token;
 
         let box_fn_path = Quote::new(boxed)
-            .quote_with(smart_quote!(Vars {}, { futures_await::__rt::Box::new }))
+            .quote_with(smart_quote!(
+                Vars {},
+                { futures_await::__rt::std::boxed::Box::new }
+            ))
             .parse();
 
         let box_stmt = Stmt::Expr(box Expr::from(ExprKind::from(ExprCall {
