@@ -3,7 +3,6 @@
 extern crate futures_await as futures;
 
 
-use futures::future::lazy;
 use futures::prelude::*;
 
 

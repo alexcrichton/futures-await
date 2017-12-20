@@ -13,7 +13,7 @@ use proc_macro2::Span;
 use std::iter;
 use syn::*;
 use syn::delimited::Element;
-use util::{call_site, ElementExt};
+use util::{call_site, quoter, ElementExt};
 
 
 impl<M: Mode> Expander<M> {
@@ -174,7 +174,7 @@ impl<M: Mode> Expander<M> {
             Some(boxed) => {
                 // We should use ::futures in type position.
                 // ::futures::__rt::Box<#bounds>
-                let path = Quote::new(boxed)
+                let path = quoter(boxed)
                     .quote_with(smart_quote!(
                         Vars {
                             TraitBounds: bounds,

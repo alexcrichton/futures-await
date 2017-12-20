@@ -5,7 +5,7 @@ use proc_macro2::{self, Span, Term};
 use quote::ToTokens;
 use syn::*;
 use syn::fold::Folder;
-use util;
+use util::{self, quoter, quoter_from_tokens, quoter_from_tokens_or};
 
 mod type_ann;
 mod for_loop;
@@ -53,35 +53,36 @@ impl Mode for Future {
             Type::Path(..) => {
                 // Path used for `::futures` in `::futures::Future<..>`.
                 // This *should* be spanned call_site to make inner functions to work.
-                let futures =
+                let futures_glob =
                     Quote::new_call_site().quote_with(smart_quote!(Vars {}, { ::futures }));
 
 
                 let bound: TypeParamBound = if for_boxed {
-                    let poly = Quote::from_tokens(&ret_ty).quote_with(smart_quote!(
+                    let poly = quoter_from_tokens(&ret_ty).quote_with(smart_quote!(
                         Vars {
+                            futures_glob: &futures_glob,
                             ReturnType: &ret_ty,
                         },
-                        { ReturnType as ::futures::__rt::IsResult }
+                        { ReturnType as futures_glob::__rt::IsResult }
                     ));
 
                     Quote::from_tokens(&ret_ty)
                         .quote_with(smart_quote!(
                             Vars {
-                                futures,
+                                // futures_glob,
                                 Result: poly,
                             },
-                            (futures::Future<Item = <Result>::Ok, Error = <Result>::Err>)
+                            (::futures::Future<Item = <Result>::Ok, Error = <Result>::Err>)
                         ))
                         .parse()
                 } else {
-                    Quote::from_tokens(&ret_ty)
+                    quoter_from_tokens(&ret_ty)
                         .quote_with(smart_quote!(
                             Vars {
-                                futures,
+                                futures_glob,
                                 Result: &ret_ty,
                             },
-                            (futures::__rt::MyFuture<Result>)
+                            (futures_glob::__rt::MyFuture<Result>)
                         ))
                         .parse()
                 };
@@ -169,11 +170,11 @@ pub fn expand_async_fn<M: Mode>(mode: M, attr: TokenStream, function: TokenStrea
 /// output_ty - Some(output_ty) for #[async] fn
 pub fn expand_async_block<M: Mode>(mode: M, block: Block, output_ty: Option<Type>) -> Block {
     /// Make function body into `__rt::gen(|| { #body })`.
-    fn call_rt_gen<M: Mode>(mode: M, block: Block, ret_ty: Option<Type>) -> Block {
+    fn call_rt_gen<M: Mode>(mode: M, block: Block, return_type: Option<Type>) -> Block {
         let brace_token = block.brace_token;
         let gen_function = Term::intern(M::RT_GEN_FN_NAME);
 
-        let gen_function = Quote::from_tokens_or(&ret_ty, (brace_token.0).0)
+        let gen_function = quoter_from_tokens_or(&return_type, (brace_token.0).0)
             .quote_with(smart_quote!(
                 Vars { gen_function },
                 { futures_await::__rt::gen_function }
@@ -205,7 +206,7 @@ pub fn expand_async_block<M: Mode>(mode: M, block: Block, output_ty: Option<Type
                 block: Block {
                     brace_token,
                     stmts: vec![
-                        type_ann::make_type_annotations(mode, brace_token, ret_ty),
+                        type_ann::make_type_annotations(mode, brace_token, return_type),
                         Stmt::Expr(box ExprKind::from(ExprBlock { block }).into()),
                     ],
                 },
@@ -278,7 +279,7 @@ impl<M: Mode> Expander<M> {
         // returns other than return type.
         let brace_token = block.brace_token;
 
-        let box_fn_path = Quote::new(boxed)
+        let box_fn_path = quoter(boxed)
             .quote_with(smart_quote!(
                 Vars {},
                 { futures_await::__rt::std::boxed::Box::new }

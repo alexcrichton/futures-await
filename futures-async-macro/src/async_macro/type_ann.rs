@@ -29,6 +29,7 @@ use proc_macro2::Span;
 use quote::{ToTokens, Tokens};
 use std::iter;
 use syn::*;
+use util::{quoter_from_tokens, quoter_from_tokens_or};
 
 pub trait TypeAnn {
     /// Create type annotation statements for yield and return.
@@ -59,6 +60,9 @@ impl TypeAnn for Future {
         }).chain(iter::once({
             // return Result<_, _>;
             // Useful when function returns non-result type.
+            // let result_type = quoter_from_tokens_or(&return_type, brace_token.0.as_token())
+            //     .quote_with(smart_quote!(Vars {}, (futures_await::__rt::Result<_, _>)))
+            //     .parse();
             let result_type = Quote::from_tokens_or(&return_type, brace_token.0.as_token())
                 .quote_with(smart_quote!(
                     Vars {},
@@ -111,7 +115,7 @@ impl TypeAnn for Stream {
         iter::once(
             // yield Result<_, _>;
             {
-                let result_type = Quote::from_tokens_or(&return_type, brace_token.0.as_token())
+                let result_type = quoter_from_tokens_or(&return_type, brace_token.0.as_token())
                     .quote_with(smart_quote!(
                         Vars {},
                         (futures_await::__rt::std::result::Result<_, _>)
@@ -122,14 +126,14 @@ impl TypeAnn for Stream {
         ).chain({
             // Exact type for O in Result<O, E>
             bounds.map(|bounds| {
-                let ok_type = Quote::from_tokens(&bounds)
+                let ok_type = quoter_from_tokens(&bounds)
                     .quote_with(smart_quote!(Vars { Bounds: bounds }, {
                         <Bounds as futures_await::stream::Stream>::Item
                     }))
                     .parse();
                 let expr = make_expr_with_type(ok_type);
 
-                Quote::from_tokens(&bounds)
+                quoter_from_tokens(&bounds)
                     .quote_with(smart_quote!(Vars { expr }, {
                         yield futures_await::__rt::std::result::Result::Ok(expr)
                     }))
@@ -139,9 +143,9 @@ impl TypeAnn for Stream {
             .chain({
                 // Exact type for E in Result<O, E>
                 bounds.map(|bounds| {
-                    Quote::from_tokens(&bounds)
+                    quoter_from_tokens(&bounds)
                         .quote_with({
-                            let stream_error_type = Quote::from_tokens(&return_type)
+                            let stream_error_type = quoter_from_tokens(&return_type)
                                 .quote_with(smart_quote!(
                                     Vars { Bounds: bounds },
                                     (futures_await::__rt::StreamError<
@@ -196,19 +200,20 @@ pub fn make_type_annotations<M: Mode>(
 
 /// Returned expression will panic or abort when executed.
 ///
-///```ignore
-///
+///```rust,ignore
 /// {
-///     let _v: #ty = unreachable!();
+///     let _v: Type = ::std::process::abort();
 ///     _v
 /// }
 ///```
 ///
 fn make_expr_with_type(ty: Type) -> Expr {
-    Quote::from_tokens(&ty)
+    // Uses abort instead of unreachable as unreachable!()
+    //   make reading cargo-expanded code much harder
+    quoter_from_tokens(&ty)
         .quote_with(smart_quote!(Vars { Type: ty }, {
             {
-                let _v: Type = unreachable!();
+                let _v: Type = futures_await::__rt::abort();
                 _v
             }
         }))

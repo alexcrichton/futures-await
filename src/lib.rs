@@ -53,6 +53,9 @@ pub mod __rt {
 
 
 
+    /// Used for type annotations.
+    pub use std::process::abort;
+
     use futures::{Async, Future, Poll, Stream};
     use std::ops::GeneratorState;
 

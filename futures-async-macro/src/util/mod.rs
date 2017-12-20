@@ -1,12 +1,63 @@
-use pmutil::prelude::SpanExt;
+use pmutil::prelude::*;
 use pmutil::synom_ext::FromSpan;
-use proc_macro2::Span;
+use pmutil::respan::Respan;
+use quote::ToTokens;
+use proc_macro2::{Span, TokenNode};
 use std::iter;
 use syn::{Block, Item, ItemExternCrate, Stmt, VisInherited};
 use syn::delimited::Element;
 
 pub fn call_site<T: FromSpan>() -> T {
     FromSpan::from_span(Span::call_site())
+}
+
+
+
+//
+///
+/// Returned quoter respans `futures` and `futures_await`
+///   with `call_site`, as it's requied to show `std::result::Result`
+///   instead of `::futures::__rt::Result`
+pub fn quoter<S>(respan: S) -> Quote
+where
+    S: 'static + Respan,
+{
+    struct Spanner<S>(S);
+    impl<S: Respan> Respan for Spanner<S> {
+        fn span_for(&self, kind: &TokenNode) -> Span {
+            let span = self.0.span_for(kind);
+            match kind {
+                &TokenNode::Term(ref term)
+                    if term.as_str() == "futures_await" || term.as_str() == "futures" =>
+                {
+                    Span::call_site()
+                }
+                _ => span,
+            }
+        }
+    }
+    Quote::new(Spanner(respan))
+}
+//
+///
+///
+pub fn quoter_from_tokens<T>(t: &T) -> Quote
+where
+    T: ToTokens,
+{
+    quoter(t.first_last())
+}
+//
+///
+///
+pub fn quoter_from_tokens_or<T>(t: &Option<T>, span: Span) -> Quote
+where
+    T: ToTokens,
+{
+    match t {
+        &Some(ref tokens) => quoter(tokens.first_last()),
+        &None => quoter(span),
+    }
 }
 
 /// Prepend `extern crate futures_await`

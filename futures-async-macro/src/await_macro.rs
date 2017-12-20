@@ -3,6 +3,7 @@
 use pmutil::prelude::*;
 use syn::*;
 use syn::fold::Folder;
+use util::quoter_from_tokens;
 
 
 /// Yield-to-poll converter
@@ -14,6 +15,7 @@ impl Folder for ExpandAwait {
     fn fold_block(&mut self, mut block: Block) -> Block {
         let len = block.stmts.len();
         if len == 0 {
+            // Use type system for error reporting.
             return expand_await_block(block_to_expr(block));
         }
 
@@ -95,32 +97,34 @@ impl Folder for ExpandAwait {
 fn expand_await_block(expr: Expr) -> Block {
     // Long names help debugging type inference failure.
 
-    return Quote::from_tokens(&expr)
+
+    //TODO: use quoter_for_tokensc
+    Quote::from_tokens(&expr)
         .quote_with(smart_quote!(Vars { fut_expr: expr }, {
             {
                 let mut future_in_await = fut_expr;
 
                 loop {
-                    extern crate futures_await as _futures_await;
+                    extern crate futures_await;
 
-                    match _futures_await::Future::poll(&mut future_in_await) {
-                        _futures_await::__rt::std::result::Result::Ok(
-                            _futures_await::Async::Ready(await_ok),
+                    match futures_await::Future::poll(&mut future_in_await) {
+                        futures_await::__rt::std::result::Result::Ok(
+                            futures_await::Async::Ready(await_ok),
                         ) => {
-                            break _futures_await::__rt::std::result::Result::Ok(await_ok);
+                            break futures_await::__rt::std::result::Result::Ok(await_ok);
                         }
-                        _futures_await::__rt::std::result::Result::Ok(
-                            _futures_await::Async::NotReady,
+                        futures_await::__rt::std::result::Result::Ok(
+                            futures_await::Async::NotReady,
                         ) => {}
-                        _futures_await::__rt::std::result::Result::Err(await_err) => {
-                            break _futures_await::__rt::std::result::Result::Err(await_err);
+                        futures_await::__rt::std::result::Result::Err(await_err) => {
+                            break futures_await::__rt::std::result::Result::Err(await_err);
                         }
                     }
-                    yield _futures_await::__rt::YieldType::not_ready();
+                    yield futures_await::__rt::YieldType::not_ready();
                 }
             }
         }))
-        .parse();
+        .parse()
 }
 
 fn block_to_expr(block: Block) -> Expr {
