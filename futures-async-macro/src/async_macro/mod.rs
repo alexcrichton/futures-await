@@ -51,7 +51,11 @@ impl Mode for Future {
     ) -> TypeImplTrait {
         match ret_ty {
             Type::Path(..) => {
-                // Respanning makes error message for unresolved type worse.
+                // Path used for `::futures` in `::futures::Future<..>`.
+                // This *should* be spanned call_site to make inner functions to work.
+                let futures =
+                    Quote::new_call_site().quote_with(smart_quote!(Vars {}, { ::futures }));
+
 
                 let bound: TypeParamBound = if for_boxed {
                     let poly = Quote::from_tokens(&ret_ty).quote_with(smart_quote!(
@@ -63,15 +67,21 @@ impl Mode for Future {
 
                     Quote::from_tokens(&ret_ty)
                         .quote_with(smart_quote!(
-                            Vars { Result: poly },
-                            (::futures::Future<Item = <Result>::Ok, Error = <Result>::Err>)
+                            Vars {
+                                futures,
+                                Result: poly,
+                            },
+                            (futures::Future<Item = <Result>::Ok, Error = <Result>::Err>)
                         ))
                         .parse()
                 } else {
                     Quote::from_tokens(&ret_ty)
                         .quote_with(smart_quote!(
-                            Vars { Result: &ret_ty },
-                            (::futures::__rt::MyFuture<Result>)
+                            Vars {
+                                futures,
+                                Result: &ret_ty,
+                            },
+                            (futures::__rt::MyFuture<Result>)
                         ))
                         .parse()
                 };
