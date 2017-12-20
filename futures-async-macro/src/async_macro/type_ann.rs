@@ -60,7 +60,10 @@ impl TypeAnn for Future {
             // return Result<_, _>;
             // Useful when function returns non-result type.
             let result_type = Quote::from_tokens_or(&return_type, brace_token.0.as_token())
-                .quote_with(smart_quote!(Vars {}, (futures_await::__rt::Result<_, _>)))
+                .quote_with(smart_quote!(
+                    Vars {},
+                    (futures_await::__rt::std::result::Result<_, _>)
+                ))
                 .parse();
 
             make_return_expr(Some(make_expr_with_type(result_type)))
@@ -109,7 +112,10 @@ impl TypeAnn for Stream {
             // yield Result<_, _>;
             {
                 let result_type = Quote::from_tokens_or(&return_type, brace_token.0.as_token())
-                    .quote_with(smart_quote!(Vars {}, (futures_await::__rt::Result<_, _>)))
+                    .quote_with(smart_quote!(
+                        Vars {},
+                        (futures_await::__rt::std::result::Result<_, _>)
+                    ))
                     .parse();
                 make_yield_expr(Some(make_expr_with_type(result_type)))
             },
@@ -124,10 +130,9 @@ impl TypeAnn for Stream {
                 let expr = make_expr_with_type(ok_type);
 
                 Quote::from_tokens(&bounds)
-                    .quote_with(smart_quote!(
-                        Vars { expr },
-                        { yield futures_await::__rt::Ok(expr) }
-                    ))
+                    .quote_with(smart_quote!(Vars { expr }, {
+                        yield futures_await::__rt::std::result::Result::Ok(expr)
+                    }))
                     .parse()
             })
         })
@@ -137,16 +142,17 @@ impl TypeAnn for Stream {
                     Quote::from_tokens(&bounds)
                         .quote_with({
                             let stream_error_type = Quote::from_tokens(&return_type)
-                                .quote_with(smart_quote!(Vars { Bounds: bounds }, {
-                                    <Bounds as futures_await::stream::Stream>::Error
-                                }))
+                                .quote_with(smart_quote!(
+                                    Vars { Bounds: bounds },
+                                    (futures_await::__rt::StreamError<
+                                        <Bounds as futures_await::stream::Stream>::Error,
+                                    >)
+                                ))
                                 .parse();
 
                             let expr = make_expr_with_type(stream_error_type);
                             smart_quote!(Vars { expr }, {
-                                yield futures_await::__rt::Err(
-                                    futures_await::__rt::StreamError::from(expr),
-                                )
+                                yield futures_await::__rt::std::result::Result::Err(expr)
                             })
                         })
                         .parse()

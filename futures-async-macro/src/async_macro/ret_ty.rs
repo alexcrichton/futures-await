@@ -179,7 +179,7 @@ impl<M: Mode> Expander<M> {
                         Vars {
                             TraitBounds: bounds,
                         },
-                        (::futures::__rt::Box<TraitBounds>)
+                        (::futures::__rt::std::boxed::Box<TraitBounds>)
                     ))
                     .parse::<Path>();
 

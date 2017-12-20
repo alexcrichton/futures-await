@@ -68,10 +68,16 @@ impl Mode for Future {
                         ))
                         .parse()
                 } else {
+                    let glob_futures =
+                        Quote::new_call_site().quote_with(smart_quote!(Vars {}, { ::futures }));
+
                     Quote::from_tokens(&ret_ty)
                         .quote_with(smart_quote!(
-                            Vars { Result: &ret_ty },
-                            (::futures::__rt::MyFuture<Result>)
+                            Vars {
+                                glob_futures,
+                                Result: &ret_ty,
+                            },
+                            (glob_futures::__rt::MyFuture<Result>)
                         ))
                         .parse()
                 };
@@ -269,7 +275,10 @@ impl<M: Mode> Expander<M> {
         let brace_token = block.brace_token;
 
         let box_fn_path = Quote::new(boxed)
-            .quote_with(smart_quote!(Vars {}, { futures_await::__rt::Box::new }))
+            .quote_with(smart_quote!(
+                Vars {},
+                { futures_await::__rt::std::boxed::Box::new }
+            ))
             .parse();
 
         let box_stmt = Stmt::Expr(box Expr::from(ExprKind::from(ExprCall {

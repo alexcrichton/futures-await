@@ -104,12 +104,16 @@ fn expand_await_block(expr: Expr) -> Block {
                     extern crate futures_await as _futures_await;
 
                     match _futures_await::Future::poll(&mut future_in_await) {
-                        _futures_await::__rt::Ok(_futures_await::Async::Ready(await_ok)) => {
-                            break _futures_await::__rt::Ok(await_ok);
+                        _futures_await::__rt::std::result::Result::Ok(
+                            _futures_await::Async::Ready(await_ok),
+                        ) => {
+                            break _futures_await::__rt::std::result::Result::Ok(await_ok);
                         }
-                        _futures_await::__rt::Ok(_futures_await::Async::NotReady) => {}
-                        _futures_await::__rt::Err(await_err) => {
-                            break _futures_await::__rt::Err(await_err);
+                        _futures_await::__rt::std::result::Result::Ok(
+                            _futures_await::Async::NotReady,
+                        ) => {}
+                        _futures_await::__rt::std::result::Result::Err(await_err) => {
+                            break _futures_await::__rt::std::result::Result::Err(await_err);
                         }
                     }
                     yield _futures_await::__rt::YieldType::not_ready();

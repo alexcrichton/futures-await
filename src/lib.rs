@@ -46,10 +46,12 @@ pub mod prelude {
 /// your code to be stable.
 #[doc(hidden)]
 pub mod __rt {
-    pub use std::boxed::Box;
+    /// rustc 1.24.0-nightly (73bca2b9f 2017-11-28) doesn't show
+    ///     std if it's module or type is pub used.
+    pub extern crate std;
     pub use std::ops::Generator;
-    pub use std::option::Option::{None, Some};
-    pub use std::result::Result::{self, Err, Ok};
+
+
 
     use futures::{Async, Future, Poll, Stream};
     use std::ops::GeneratorState;
