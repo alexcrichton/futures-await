@@ -13,31 +13,36 @@
 #![feature(proc_macro)]
 #![recursion_limit = "128"]
 
-extern crate proc_macro2;
 extern crate proc_macro;
+extern crate proc_macro2;
 #[macro_use]
 extern crate quote;
 #[macro_use]
 extern crate syn;
 
+macro_rules! quote_cs {
+    ($($t:tt)*) => (quote_spanned!(::proc_macro2::Span::call_site() => $($t)*))
+}
+mod type_ann;
+
+use type_ann::TypeData;
 use proc_macro2::Span;
-use proc_macro::{TokenStream, TokenTree, Delimiter, TokenNode};
-use quote::{Tokens, ToTokens};
+use proc_macro::{Delimiter, TokenNode, TokenStream, TokenTree};
+use quote::{ToTokens, Tokens};
 use syn::*;
 use syn::punctuated::Punctuated;
 use syn::fold::Fold;
 
-macro_rules! quote_cs {
-    ($($t:tt)*) => (quote_spanned!(Span::call_site() => $($t)*))
-}
-
-fn async_inner<F>(
+fn async_inner<F, D>(
     boxed: bool,
     function: TokenStream,
+    mut type_data: D,
     gen_function: Tokens,
     return_ty: F,
 ) -> TokenStream
-where F: FnOnce(&Type) -> proc_macro2::TokenStream
+where
+    F: FnOnce(&Type) -> proc_macro2::TokenStream,
+    D: TypeData,
 {
     // Parse our item, expecting a function. This function may be an actual
     // top-level function or it could be a method (typically dictated by the
@@ -68,13 +73,15 @@ where F: FnOnce(&Type) -> proc_macro2::TokenStream
     assert!(variadic.is_none(), "variadic functions cannot be async");
     let (output, rarrow_token) = match output {
         ReturnType::Type(rarrow_token, t) => (*t, rarrow_token),
-        ReturnType::Default => {
-            (TypeTuple {
+        ReturnType::Default => (
+            TypeTuple {
                 elems: Default::default(),
                 paren_token: Default::default(),
-            }.into(), Default::default())
-        }
+            }.into(),
+            Default::default(),
+        ),
     };
+    type_data.set_output(&output);
 
     // We've got to get a bit creative with our handling of arguments. For a
     // number of reasons we translate this:
@@ -106,7 +113,7 @@ where F: FnOnce(&Type) -> proc_macro2::TokenStream
         // `self: Box<Self>` will get captured naturally
         let mut is_input_no_pattern = false;
         if let FnArg::Captured(ref arg) = input {
-            if let Pat::Ident(PatIdent { ref ident, ..}) = arg.pat {
+            if let Pat::Ident(PatIdent { ref ident, .. }) = arg.pat {
                 if ident == "self" {
                     is_input_no_pattern = true;
                 }
@@ -114,22 +121,23 @@ where F: FnOnce(&Type) -> proc_macro2::TokenStream
         }
         if is_input_no_pattern {
             inputs_no_patterns.push(input);
-            continue
+            continue;
         }
 
         match input {
             FnArg::Captured(ArgCaptured {
-                pat: syn::Pat::Ident(syn::PatIdent {
-                    by_ref: None,
-                    ..
-                }),
+                pat: syn::Pat::Ident(syn::PatIdent { by_ref: None, .. }),
                 ..
             }) => {
                 inputs_no_patterns.push(input);
             }
 
             // `ref a: B` (or some similar pattern)
-            FnArg::Captured(ArgCaptured { pat, ty, colon_token }) => {
+            FnArg::Captured(ArgCaptured {
+                pat,
+                ty,
+                colon_token,
+            }) => {
                 patterns.push(pat);
                 let ident = Ident::from(format!("__arg_{}", i));
                 temp_bindings.push(ident.clone());
@@ -139,11 +147,13 @@ where F: FnOnce(&Type) -> proc_macro2::TokenStream
                     ident: ident,
                     subpat: None,
                 };
-                inputs_no_patterns.push(ArgCaptured {
-                    pat: pat.into(),
-                    ty,
-                    colon_token,
-                }.into());
+                inputs_no_patterns.push(
+                    ArgCaptured {
+                        pat: pat.into(),
+                        ty,
+                        colon_token,
+                    }.into(),
+                );
             }
 
             // Other `self`-related arguments get captured naturally
@@ -172,18 +182,21 @@ where F: FnOnce(&Type) -> proc_macro2::TokenStream
     block.brace_token.surround(&mut result, |tokens| {
         block_inner.to_tokens(tokens);
     });
-    syn::token::Semi([block.brace_token.0]).to_tokens(&mut result);
+    // syn::tokens::Semi([block.brace_token.0]).to_tokens(&mut result);
+
+    let type_annotations = type_ann::make_type_annotations(type_data);
 
     let gen_body_inner = quote_cs! {
-        let __e: #output = #result
-
         // Ensure that this closure is a generator, even if it doesn't
         // have any `yield` statements.
         #[allow(unreachable_code)]
         {
-            return __e;
-            loop { yield ::futures::Async::NotReady }
+            if false {
+                #type_annotations
+            }
         }
+
+        #result
     };
     let mut gen_body = Tokens::new();
     block.brace_token.surround(&mut gen_body, |tokens| {
@@ -196,7 +209,7 @@ where F: FnOnce(&Type) -> proc_macro2::TokenStream
     let output_span = first_last(&output);
     let gen_function = respan(gen_function.into(), &output_span);
     let body_inner = quote_cs! {
-        #gen_function (move || -> #output #gen_body)
+        #gen_function (move || #gen_body)
     };
     let body_inner = if boxed {
         let body = quote_cs! { ::futures::__rt::std::boxed::Box::new(#body_inner) };
@@ -234,38 +247,46 @@ pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
         panic!("the #[async] attribute currently only takes `boxed` as an arg");
     };
 
-    async_inner(boxed, function, quote_cs! { ::futures::__rt::gen }, |output| {
-        // TODO: can we lift the restriction that `futures` must be at the root of
-        //       the crate?
-        let output_span = first_last(&output);
-        let return_ty = if boxed {
-            quote_cs! {
-                ::futures::__rt::std::boxed::Box<::futures::Future<
-                    Item = <! as ::futures::__rt::IsResult>::Ok,
-                    Error = <! as ::futures::__rt::IsResult>::Err,
-                >>
-            }
-        } else {
-            // Dunno why this is buggy, hits weird typecheck errors in tests
-            //
-            // quote_cs! {
-            //     impl ::futures::Future<
-            //         Item = <#output as ::futures::__rt::MyTry>::MyOk,
-            //         Error = <#output as ::futures::__rt::MyTry>::MyError,
-            //     >
-            // }
-            quote_cs! { impl ::futures::__rt::MyFuture<!> + 'static }
-        };
-        let return_ty = respan(return_ty.into(), &output_span);
-        replace_bang(return_ty, &output)
-    })
+    let type_data = type_ann::Future { output: None };
+
+    async_inner(
+        boxed,
+        function,
+        type_data,
+        quote_cs! { ::futures::__rt::gen },
+        |output| {
+            // TODO: can we lift the restriction that `futures` must be at the root of
+            //       the crate?
+            let output_span = first_last(&output);
+            let return_ty = if boxed {
+                quote_cs! {
+                    ::futures::__rt::std::boxed::Box<::futures::Future<
+                        Item = <! as ::futures::__rt::IsResult>::Ok,
+                        Error = <! as ::futures::__rt::IsResult>::Err,
+                    >>
+                }
+            } else {
+                // Dunno why this is buggy, hits weird typecheck errors in tests
+                //
+                // quote_cs! {
+                //     impl ::futures::Future<
+                //         Item = <#output as ::futures::__rt::MyTry>::MyOk,
+                //         Error = <#output as ::futures::__rt::MyTry>::MyError,
+                //     >
+                // }
+                quote_cs! { impl ::futures::__rt::MyFuture<!> + 'static }
+            };
+            let return_ty = respan(return_ty.into(), &output_span);
+            replace_bang(return_ty, &output)
+        },
+    )
 }
 
 #[proc_macro_attribute]
 pub fn async_stream(attribute: TokenStream, function: TokenStream) -> TokenStream {
     // Handle arguments to the #[async_stream] attribute, if any
-    let args = syn::parse::<AsyncStreamArgs>(attribute)
-        .expect("failed to parse attribute arguments");
+    let args =
+        syn::parse::<AsyncStreamArgs>(attribute).expect("failed to parse attribute arguments");
 
     let mut boxed = false;
     let mut item_ty = None;
@@ -289,7 +310,10 @@ pub fn async_stream(attribute: TokenStream, function: TokenStream) -> TokenStrea
                     }
                     item_ty = Some(ty);
                 } else {
-                    panic!("unexpected #[async_stream] argument '{}'", quote_cs!(#term = #ty));
+                    panic!(
+                        "unexpected #[async_stream] argument '{}'",
+                        quote_cs!(#term = #ty)
+                    );
                 }
             }
         }
@@ -298,21 +322,32 @@ pub fn async_stream(attribute: TokenStream, function: TokenStream) -> TokenStrea
     let boxed = boxed;
     let item_ty = item_ty.expect("#[async_stream] requires item type to be specified");
 
-    async_inner(boxed, function, quote_cs! { ::futures::__rt::gen_stream }, |output| {
-        let output_span = first_last(&output);
-        let return_ty = if boxed {
-            quote_cs! {
-                ::futures::__rt::std::boxed::Box<::futures::Stream<
-                    Item = !,
-                    Error = <! as ::futures::__rt::IsResult>::Err,
-                >>
-            }
-        } else {
-            quote_cs! { impl ::futures::__rt::MyStream<!, !> + 'static }
-        };
-        let return_ty = respan(return_ty.into(), &output_span);
-        replace_bangs(return_ty, &[&item_ty, &output])
-    })
+    let type_data = type_ann::Stream {
+        output: None,
+        item: Some(type_ann::reparse(&item_ty)),
+    };
+
+    async_inner(
+        boxed,
+        function,
+        type_data,
+        quote_cs! { ::futures::__rt::gen_stream },
+        |output| {
+            let output_span = first_last(&output);
+            let return_ty = if boxed {
+                quote_cs! {
+                    ::futures::__rt::std::boxed::Box<::futures::Stream<
+                        Item = !,
+                        Error = <! as ::futures::__rt::IsResult>::Err,
+                    >>
+                }
+            } else {
+                quote_cs! { impl ::futures::__rt::MyStream<!, !> + 'static }
+            };
+            let return_ty = respan(return_ty.into(), &output_span);
+            replace_bangs(return_ty, &[&item_ty, &output])
+        },
+    )
 }
 
 #[proc_macro]
@@ -321,8 +356,7 @@ pub fn async_block(input: TokenStream) -> TokenStream {
         kind: TokenNode::Group(Delimiter::Brace, input),
         span: proc_macro::Span::def_site(),
     });
-    let expr = syn::parse(input)
-        .expect("failed to parse tokens as an expression");
+    let expr = syn::parse(input).expect("failed to parse tokens as an expression");
     let expr = ExpandAsyncFor.fold_expr(expr);
 
     let mut tokens = quote_cs! {
@@ -352,8 +386,7 @@ pub fn async_stream_block(input: TokenStream) -> TokenStream {
         kind: TokenNode::Group(Delimiter::Brace, input),
         span: proc_macro::Span::def_site(),
     });
-    let expr = syn::parse(input)
-        .expect("failed to parse tokens as an expression");
+    let expr = syn::parse(input).expect("failed to parse tokens as an expression");
     let expr = ExpandAsyncFor.fold_expr(expr);
 
     let mut tokens = quote_cs! {
@@ -396,13 +429,19 @@ impl Fold for ExpandAsyncFor {
             }
         }
         if !async {
-            return expr
+            return expr;
         }
         let all = match expr {
             Expr::ForLoop(item) => item,
             _ => panic!("only for expressions can have #[async]"),
         };
-        let ExprForLoop { pat, expr, body, label, .. } = all;
+        let ExprForLoop {
+            pat,
+            expr,
+            body,
+            label,
+            ..
+        } = all;
 
         // Basically just expand to a `poll` loop
         let tokens = quote_cs! {{
@@ -441,14 +480,21 @@ impl Fold for ExpandAsyncFor {
 fn first_last(tokens: &ToTokens) -> (Span, Span) {
     let mut spans = Tokens::new();
     tokens.to_tokens(&mut spans);
-    let good_tokens = proc_macro2::TokenStream::from(spans).into_iter().collect::<Vec<_>>();
-    let first_span = good_tokens.first().map(|t| t.span).unwrap_or(Span::def_site());
+    let good_tokens = proc_macro2::TokenStream::from(spans)
+        .into_iter()
+        .collect::<Vec<_>>();
+    let first_span = good_tokens
+        .first()
+        .map(|t| t.span)
+        .unwrap_or(Span::def_site());
     let last_span = good_tokens.last().map(|t| t.span).unwrap_or(first_span);
     (first_span, last_span)
 }
 
-fn respan(input: proc_macro2::TokenStream,
-          &(first_span, last_span): &(Span, Span)) -> proc_macro2::TokenStream {
+fn respan(
+    input: proc_macro2::TokenStream,
+    &(first_span, last_span): &(Span, Span),
+) -> proc_macro2::TokenStream {
     let mut new_tokens = input.into_iter().collect::<Vec<_>>();
     if let Some(token) = new_tokens.first_mut() {
         token.span = first_span;
@@ -459,9 +505,7 @@ fn respan(input: proc_macro2::TokenStream,
     new_tokens.into_iter().collect()
 }
 
-fn replace_bang(input: proc_macro2::TokenStream, tokens: &ToTokens)
-    -> proc_macro2::TokenStream
-{
+fn replace_bang(input: proc_macro2::TokenStream, tokens: &ToTokens) -> proc_macro2::TokenStream {
     let mut new_tokens = Tokens::new();
     for token in input.into_iter() {
         match token.kind {
@@ -472,9 +516,10 @@ fn replace_bang(input: proc_macro2::TokenStream, tokens: &ToTokens)
     new_tokens.into()
 }
 
-fn replace_bangs(input: proc_macro2::TokenStream, replacements: &[&ToTokens])
-    -> proc_macro2::TokenStream
-{
+fn replace_bangs(
+    input: proc_macro2::TokenStream,
+    replacements: &[&ToTokens],
+) -> proc_macro2::TokenStream {
     let mut replacements = replacements.iter().cycle();
     let mut new_tokens = Tokens::new();
     for token in input.into_iter() {
