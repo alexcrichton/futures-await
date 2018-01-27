@@ -1,5 +1,6 @@
 //! Creates type annotations for yield and return.
 use syn::*;
+use super::{first_last, respan};
 use quote::{ToTokens, Tokens};
 use std::iter;
 
@@ -102,8 +103,12 @@ pub fn make_type_annotations<D: TypeData>(mut data: D) -> Tokens {
 fn make_expr_with_type(ty: Type) -> Tokens {
     // use abort instead of unreachable because unreachable!()
     //   make reading cargo-expanded code too hard.
+    let sp = first_last(&ty);
+    let val = respan(quote!(_v).into(), &sp);
+    let abort_expr = respan(quote!(::futures::__rt::std::process::abort()).into(), &sp);
+
     quote_cs!({
-        let _v: #ty = ::futures::__rt::std::process::abort();
-        _v
+        let #val: #ty = #abort_expr;
+        #val
     })
 }

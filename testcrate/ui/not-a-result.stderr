@@ -1,8 +1,8 @@
 error[E0308]: mismatched types
- --> $DIR/not-a-result.rs:7:1
+ --> $DIR/not-a-result.rs:8:13
   |
-7 | #[async]
-  | ^^^^^^^^ expected enum `std::result::Result`, found u32
+8 | fn foo() -> u32 {
+  |             ^^^ expected enum `std::result::Result`, found u32
   |
   = note: expected type `std::result::Result<_, _>`
              found type `u32`
@@ -38,10 +38,10 @@ error[E0277]: the trait bound `u32: futures::__rt::IsResult` is not satisfied
    = help: the trait `futures::__rt::IsResult` is not implemented for `u32`
 
 error[E0308]: mismatched types
-  --> $DIR/not-a-result.rs:12:1
+  --> $DIR/not-a-result.rs:13:13
    |
-12 | #[async(boxed)]
-   | ^^^^^^^^^^^^^^^ expected enum `std::result::Result`, found u32
+13 | fn bar() -> u32 {
+   |             ^^^ expected enum `std::result::Result`, found u32
    |
    = note: expected type `std::result::Result<_, _>`
               found type `u32`
@@ -64,10 +64,10 @@ error[E0308]: mismatched types
               found type `{integer}`
 
 error[E0308]: mismatched types
-  --> $DIR/not-a-result.rs:17:1
+  --> $DIR/not-a-result.rs:18:14
    |
-17 | #[async_stream(item = u32)]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected enum `std::result::Result`, found u32
+18 | fn foos() -> u32 {
+   |              ^^^ expected enum `std::result::Result`, found u32
    |
    = note: expected type `std::result::Result<(), _>`
               found type `u32`
@@ -103,10 +103,10 @@ error[E0277]: the trait bound `u32: futures::__rt::IsResult` is not satisfied
    = help: the trait `futures::__rt::IsResult` is not implemented for `u32`
 
 error[E0308]: mismatched types
-  --> $DIR/not-a-result.rs:22:1
+  --> $DIR/not-a-result.rs:23:14
    |
-22 | #[async_stream(boxed, item = u32)]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected enum `std::result::Result`, found u32
+23 | fn bars() -> u32 {
+   |              ^^^ expected enum `std::result::Result`, found u32
    |
    = note: expected type `std::result::Result<(), _>`
               found type `u32`
