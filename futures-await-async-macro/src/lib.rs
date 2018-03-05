@@ -293,14 +293,14 @@ pub fn async_move(attribute: TokenStream, function: TokenStream) -> TokenStream 
                 ::futures::__rt::std::boxed::Box<::futures::__rt::Future<
                     Item = <! as ::futures::__rt::IsResult>::Ok,
                     Error = <! as ::futures::__rt::IsResult>::Err,
-                > + ::futures::__rt::std::marker::Unpin + #(#lifetimes +)*>
+                > + ::futures::__rt::core::marker::Unpin + #(#lifetimes +)*>
             }
         } else if boxed && send {
             quote_cs! {
                 ::futures::__rt::std::boxed::Box<::futures::__rt::Future<
                     Item = <! as ::futures::__rt::IsResult>::Ok,
                     Error = <! as ::futures::__rt::IsResult>::Err,
-                > + ::futures::__rt::std::marker::Unpin + Send + #(#lifetimes +)*>
+                > + ::futures::__rt::core::marker::Unpin + Send + #(#lifetimes +)*>
             }
         } else {
             // Dunno why this is buggy, hits weird typecheck errors in tests
@@ -416,7 +416,7 @@ pub fn async_stream_move(attribute: TokenStream, function: TokenStream) -> Token
                 ::futures::__rt::std::boxed::Box<::futures::__rt::Stream<
                     Item = !,
                     Error = <! as ::futures::__rt::IsResult>::Err,
-                > + ::futures::__rt::std::marker::Unpin + #(#lifetimes +)*>
+                > + ::futures::__rt::core::marker::Unpin + #(#lifetimes +)*>
             }
         } else {
             quote_cs! { impl ::futures::__rt::MyStream<!, !> + #(#lifetimes +)* }
@@ -523,15 +523,15 @@ impl Fold for ExpandAsyncFor {
                 let #pat = {
                     let r = {
                         let pin = unsafe {
-                            ::futures::__rt::std::mem::Pin::new_unchecked(&mut __stream)
+                            ::futures::__rt::core::mem::Pin::new_unchecked(&mut __stream)
                         };
                         ::futures::__rt::in_ctx(|ctx| ::futures::__rt::StableStream::poll_next(pin, ctx))
                     };
                     match r? {
                         ::futures::__rt::Async::Ready(e) => {
                             match e {
-                                ::futures::__rt::std::option::Option::Some(e) => e,
-                                ::futures::__rt::std::option::Option::None => break,
+                                ::futures::__rt::core::option::Option::Some(e) => e,
+                                ::futures::__rt::core::option::Option::None => break,
                             }
                         }
                         ::futures::__rt::Async::Pending => {

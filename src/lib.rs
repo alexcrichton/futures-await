@@ -12,6 +12,8 @@
 //!
 //! See the crates's README for more information about usage.
 
+#![no_std]
+
 #![feature(conservative_impl_trait)]
 #![feature(generator_trait)]
 #![feature(use_extern_macros)]
@@ -19,6 +21,10 @@
 #![feature(arbitrary_self_types)]
 #![feature(optin_builtin_traits)]
 #![feature(pin)]
+
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
 
 extern crate futures_await_async_macro as async_macro;
 extern crate futures_await_await_macro as await_macro;

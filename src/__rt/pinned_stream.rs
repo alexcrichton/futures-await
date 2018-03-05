@@ -1,6 +1,6 @@
-use std::mem::Pin;
-use std::ops::{Generator, GeneratorState};
-use std::marker::{PhantomData, Unpin};
+use core::mem::Pin;
+use core::ops::{Generator, GeneratorState};
+use core::marker::{PhantomData, Unpin};
 
 use futures::task;
 use futures::prelude::{Poll, Async};
