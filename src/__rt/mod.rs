@@ -44,6 +44,23 @@ type StaticContext = *mut task::Context<'static>;
 #[cfg(feature = "std")]
 thread_local!(static CTX: Cell<StaticContext> = Cell::new(ptr::null_mut()));
 
+#[cfg(not(feature = "std"))]
+pub struct NonLocalKey<T: 'static>(T);
+
+#[cfg(not(feature = "std"))]
+impl<T: 'static> NonLocalKey<T> {
+    pub fn with<F, R>(&'static self, f: F) -> R where F: FnOnce(&T) -> R {
+        f(&self.0)
+    }
+}
+
+#[cfg(not(feature = "std"))]
+// Very definitely not safe...
+unsafe impl<T: 'static> Sync for NonLocalKey<T> {}
+
+#[cfg(not(feature = "std"))]
+pub static CTX: NonLocalKey<Cell<StaticContext>> = NonLocalKey(Cell::new(ptr::null_mut()));
+
 struct Reset<'a>(StaticContext, &'a Cell<StaticContext>);
 
 impl<'a> Reset<'a> {
