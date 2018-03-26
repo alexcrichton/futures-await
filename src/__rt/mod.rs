@@ -2,9 +2,10 @@ mod future;
 mod stream;
 mod pinned_future; mod pinned_stream;
 
-use std::cell::Cell;
-use std::mem;
-use std::ptr;
+use core::cell::Cell;
+use core::mem;
+use core::ptr;
+use core::result::Result;
 use futures::task;
 
 pub use self::future::*;
@@ -15,9 +16,11 @@ pub use self::pinned_stream::*;
 pub use futures::prelude::{Async, Future, Stream};
 pub use futures::stable::{StableFuture, StableStream};
 
+pub extern crate core;
+#[cfg(feature = "std")]
 pub extern crate std;
 
-pub use std::ops::Generator;
+pub use core::ops::Generator;
 
 #[rustc_on_unimplemented = "async functions must return a `Result` or \
                             a typedef of `Result`"]
@@ -38,7 +41,25 @@ pub fn diverge<T>() -> T { loop {} }
 
 type StaticContext = *mut task::Context<'static>;
 
+#[cfg(feature = "std")]
 thread_local!(static CTX: Cell<StaticContext> = Cell::new(ptr::null_mut()));
+
+#[cfg(not(feature = "std"))]
+pub struct NonLocalKey<T: 'static>(T);
+
+#[cfg(not(feature = "std"))]
+impl<T: 'static> NonLocalKey<T> {
+    pub fn with<F, R>(&'static self, f: F) -> R where F: FnOnce(&T) -> R {
+        f(&self.0)
+    }
+}
+
+#[cfg(not(feature = "std"))]
+// Very definitely not safe...
+unsafe impl<T: 'static> Sync for NonLocalKey<T> {}
+
+#[cfg(not(feature = "std"))]
+pub static CTX: NonLocalKey<Cell<StaticContext>> = NonLocalKey(Cell::new(ptr::null_mut()));
 
 struct Reset<'a>(StaticContext, &'a Cell<StaticContext>);
 
