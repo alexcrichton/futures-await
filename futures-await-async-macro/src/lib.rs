@@ -214,7 +214,12 @@ where F: FnOnce(&Type, &[&Lifetime]) -> proc_macro2::TokenStream
         }
     };
     let body_inner = if boxed {
-        let body = quote_cs! { ::futures::__rt::std::boxed::Box::new(#body_inner) };
+        let body = if pinned {
+            quote_cs! { (#body_inner).pin() } // TODO: Use pin_local if !send.
+        } else {
+            quote_cs! { ::futures::__rt::std::boxed::Box::new(#body_inner) }
+        };
+
         respan(body.into(), &output_span)
     } else {
         body_inner.into()
@@ -252,21 +257,21 @@ pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
         let output_span = first_last(&output);
         let return_ty = if boxed && !send {
             quote_cs! {
-                ::futures::__rt::boxed::PinBox<::futures::__rt::Future<
+                ::futures::__rt::std::boxed::PinBox<::futures::__rt::Future<
                     Item = <! as ::futures::__rt::IsResult>::Ok,
                     Error = <! as ::futures::__rt::IsResult>::Err,
-                >>
+                > + #(#lifetimes +)*>
             }
         } else if boxed && send {
             quote_cs! {
-                ::futures::__rt::boxed::PinBox<::futures::__rt::Future<
+                ::futures::__rt::std::boxed::PinBox<::futures::__rt::Future<
                     Item = <! as ::futures::__rt::IsResult>::Ok,
                     Error = <! as ::futures::__rt::IsResult>::Err,
-                > + Send>
+                > + Send + #(#lifetimes +)*>
             }
         } else {
             quote_cs! {
-                impl ::futures::__rt::MyStableFuture<!> + #( #lifetimes + )*
+                impl ::futures::__rt::MyStableFuture<!> + #(#lifetimes +)*
             }
         };
         let return_ty = respan(return_ty.into(), &output_span);
@@ -359,7 +364,7 @@ pub fn async_stream(attribute: TokenStream, function: TokenStream) -> TokenStrea
         let output_span = first_last(&output);
         let return_ty = if boxed {
             quote_cs! {
-                ::futures::__rt::boxed::PinBox<::futures::__rt::Stream<
+                ::futures::__rt::std::boxed::PinBox<::futures::__rt::Stream<
                     Item = !,
                     Error = <! as ::futures::__rt::IsResult>::Err,
                 > + #(#lifetimes +)*>
