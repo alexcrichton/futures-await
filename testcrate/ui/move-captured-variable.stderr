@@ -1,3 +1,11 @@
+warning: use of deprecated item 'futures': `futures-await` has been merged into the main `futures` repository, please switch to depending directly on `futures` with the `nightly` feature activated
+ --> $DIR/move-captured-variable.rs:3:1
+  |
+3 | extern crate futures_await as futures;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: #[warn(deprecated)] on by default
+
 error[E0507]: cannot move out of captured outer variable in an `FnMut` closure
   --> $DIR/move-captured-variable.rs:12:9
    |
