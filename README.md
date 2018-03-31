@@ -1,3 +1,10 @@
+# DEPRECATED
+
+`futures-await` has been merged into the main [`futures` repository][], please
+switch to depending directly on `futures` with the `nightly` feature activated.
+
+[`futures` repository]: https://github.com/rust-lang-nursery/futures-rs
+
 # futures-await
 
 Async/await syntax for Rust and the [`futures`] crate
