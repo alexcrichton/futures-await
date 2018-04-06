@@ -118,7 +118,7 @@ pub mod __rt {
         type Error = <T::Return as IsResult>::Err;
 
         fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-            match self.0.resume() {
+            match unsafe { self.0.resume() } {
                 GeneratorState::Yielded(Async::NotReady)
                     => Ok(Async::NotReady),
                 GeneratorState::Yielded(Async::Ready(mu))
@@ -138,7 +138,7 @@ pub mod __rt {
 
         fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
             if self.done { return Ok(Async::Ready(None)) }
-            match self.gen.resume() {
+            match unsafe { self.gen.resume() } {
                 GeneratorState::Yielded(Async::Ready(e)) => {
                     Ok(Async::Ready(Some(e)))
                 }
