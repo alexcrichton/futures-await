@@ -13,10 +13,10 @@ few other assorted macros.
 proc-macro = true
 
 [dependencies]
-quote = "0.4"
-proc-macro2 = { version = "0.2", features = ["nightly"] }
+quote = "0.5"
+proc-macro2 = { version = "0.3", features = ["nightly"] }
 
 [dependencies.syn]
-version = "0.12.13"
-features = ["full", "fold", "parsing", "printing", "extra-traits"]
+version = "0.13"
+features = ["full", "fold", "parsing", "printing", "extra-traits", "proc-macro"]
 default-features = false
