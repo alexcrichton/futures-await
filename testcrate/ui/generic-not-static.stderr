@@ -28,3 +28,4 @@ note: ...so that the type `impl futures::__rt::MyStream<T, <[generator@$DIR/gene
 
 error: aborting due to 2 previous errors
 
+For more information about this error, try `rustc --explain E0310`.
