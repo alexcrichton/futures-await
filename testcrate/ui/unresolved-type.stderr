@@ -28,3 +28,5 @@ note: the type is part of the generator because of this `yield`
 
 error: aborting due to 3 previous errors
 
+Some errors occurred: E0412, E0907.
+For more information about an error, try `rustc --explain E0412`.
