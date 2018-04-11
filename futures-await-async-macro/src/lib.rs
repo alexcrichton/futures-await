@@ -341,7 +341,7 @@ pub fn async_stream(attribute: TokenStream, function: TokenStream) -> TokenStrea
 #[proc_macro]
 pub fn async_block(input: TokenStream) -> TokenStream {
 	let mut t_tree = TokenTree::Group(proc_macro::Group::new(Delimiter::Brace, input));
-	t_tree.set_span(proc_macro::Span::def_site());
+	t_tree.set_span(proc_macro::Span::call_site());
 	let input = TokenStream::from(t_tree);
 
 	let expr = syn::parse(input).expect("failed to parse tokens as an expression");
@@ -371,7 +371,7 @@ pub fn async_block(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn async_stream_block(input: TokenStream) -> TokenStream {
 	let mut t_tree = TokenTree::Group(proc_macro::Group::new(Delimiter::Brace, input));
-	t_tree.set_span(proc_macro::Span::def_site());
+	t_tree.set_span(proc_macro::Span::call_site());
 	let input = TokenStream::from(t_tree);
 	let expr = syn::parse(input).expect("failed to parse tokens as an expression");
 	let expr = ExpandAsyncFor.fold_expr(expr);
@@ -473,7 +473,7 @@ fn first_last(tokens: &ToTokens) -> (Span, Span) {
 	let first_span = good_tokens
 		.first()
 		.map(|t| t.span())
-		.unwrap_or(Span::def_site());
+		.unwrap_or(Span::call_site());
 	let last_span = good_tokens.last().map(|t| t.span()).unwrap_or(first_span);
 	(first_span, last_span)
 }
