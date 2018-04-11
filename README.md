@@ -135,7 +135,7 @@ futures-await = "0.1"
 and then...
 
 ```rust
-#![feature(proc_macro, conservative_impl_trait, generators)]
+#![feature(proc_macro, generators)]
 
 extern crate futures_await as futures;
 
@@ -335,9 +335,7 @@ Otherwise there's a few primary "APIs" provided by this crate:
 
 ### Nightly features
 
-Right now this crate requires two nightly features to be used, and practically
-requires three features to be used to its fullest extent. These three features
-are:
+Right now this crate requires two nightly features to be used:
 
 * `#![feature(generators)]` - this is an experimental language feature that has
   yet to be stabilized but is the foundation for the implementation of
@@ -350,21 +348,11 @@ are:
   via `use` instead of `#[macro_use]`. Tracking issues for this feature include
   [#38356] and [#35896].
 
-* `#![feature(conservative_impl_trait)]` - this feature is not actually required
-  to use the crate if you opt to always use trait objects via `#[async(boxed)]`,
-  but it's practically required to use the crate ergonomically. This feature is
-  used because each function returns `impl Future<...>` instead of a concrete
-  type of future. This feature is tracked at [#34511] and [#42183].
-
 [gentrack]: https://github.com/rust-lang/rust/issues/43122
 [#38356]: https://github.com/rust-lang/rust/issues/38356
 [#35896]: https://github.com/rust-lang/rust/issues/35896
 [#34511]: https://github.com/rust-lang/rust/issues/34511
 [#42183]: https://github.com/rust-lang/rust/issues/42183
-
-The intention with this crate is that the newest feature, `generators`, will
-be the last to stabilize. The other two, `proc_macro` and
-`conservative_impl_trait`, should hopefully stabilize ahead of generators!
 
 ## What's next?
 
