@@ -335,21 +335,14 @@ Otherwise there's a few primary "APIs" provided by this crate:
 
 ### Nightly features
 
-Right now this crate requires three nightly features to be used, and practically
-requires four features to be used to its fullest extent. These four features
+Right now this crate requires two nightly features to be used, and practically
+requires three features to be used to its fullest extent. These three features
 are:
 
 * `#![feature(generators)]` - this is an experimental language feature that has
   yet to be stabilized but is the foundation for the implementation of
-  async/await. The implementation [landed a while ago][genpr] and progress on
+  async/await. The implemented [landed recently][genpr] and progress on
   stabilization can be found on its [tracking issue][gentrack].
-
-* `#![feature(pin)]` - this is another experimental language feature that works
-  together with `generators` to provide support for immovable self-referential
-  generators, without this `async` functions cannot have borrows that exist
-  across the yield points used inside `await!`. The implementation [landed very
-  recently][pinpr] and progress on stabilization can be found on its [tracking
-  issue][pintrack].
 
 * `#![feature(proc_macro)]` - this has also been dubbed "Macros 2.0" and is how
   the `#[async]` attribute is defined in this crate and not the compiler itself.
@@ -364,8 +357,6 @@ are:
   type of future. This feature is tracked at [#34511] and [#42183].
 
 [gentrack]: https://github.com/rust-lang/rust/issues/43122
-[pinpr]: https://github.com/rust-lang/rust/pull/49058
-[pintrack]: https://github.com/rust-lang/rust/issues/49150
 [#38356]: https://github.com/rust-lang/rust/issues/38356
 [#35896]: https://github.com/rust-lang/rust/issues/35896
 [#34511]: https://github.com/rust-lang/rust/issues/34511
@@ -610,5 +601,5 @@ at your option.
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in `futures-await` by you, as defined in the Apache-2.0 license, shall be
+for inclusion in Serde by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.

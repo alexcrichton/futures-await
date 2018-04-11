@@ -1,6 +1,6 @@
 [package]
 name = "futures-await"
-version = "0.2.0-alpha"
+version = "0.1.1"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
@@ -19,6 +19,11 @@ intends to be used with the `futures` crate on crates.io as well.
 members = ["testcrate"]
 
 [dependencies]
-futures-await-async-macro = { path = "futures-await-async-macro", version = "0.2.0-alpha" }
-futures-await-await-macro = { path = "futures-await-await-macro", version = "0.2.0-alpha" }
-futures = { git = "https://github.com/rust-lang-nursery/futures-rs.git", features = ["nightly"] }
+futures-await-async-macro = { path = "futures-await-async-macro", version = "0.1" }
+futures-await-await-macro = { path = "futures-await-await-macro", version = "0.1" }
+futures = "0.1"
+
+[dev-dependencies]
+futures-cpupool = "0.1"
+tokio-core = "0.1"
+tokio-io = "0.1"
