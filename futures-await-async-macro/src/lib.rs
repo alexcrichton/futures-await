@@ -231,8 +231,8 @@ where
 pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
 	// Handle arguments to the #[async] attribute, if any
 	let (boxed, send) = match &attribute.to_string() as &str {
-		"( boxed )" => (true, false),
-		"( boxed_send )" => (true, true),
+		"boxed" => (true, false),
+		"boxed_send" => (true, true),
 		"" => (false, false),
 		_ => panic!("the #[async] attribute currently only takes `boxed` as an arg"),
 	};
