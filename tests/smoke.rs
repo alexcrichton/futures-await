@@ -3,7 +3,7 @@
 //! This is mostly a test for this repository itself, not necessarily serving
 //! much more purpose than that.
 
-#![feature(proc_macro, generators)]
+#![feature(proc_macro, proc_macro_non_items, generators)]
 
 extern crate futures_await as futures;
 extern crate futures_cpupool;

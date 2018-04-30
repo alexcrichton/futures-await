@@ -2,7 +2,7 @@
 //!
 //! Very similar to the example at https://tokio.rs
 
-#![feature(proc_macro, generators)]
+#![feature(proc_macro, proc_macro_non_items, generators)]
 
 extern crate futures_await as futures;
 extern crate tokio_core;
