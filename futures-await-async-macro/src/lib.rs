@@ -9,7 +9,6 @@
 //! Currently this crate depends on `syn` and `quote` to do all the heavy
 //! lifting, this is just a very small shim around creating a closure/future out
 //! of a generator.
-
 #![feature(proc_macro)]
 #![recursion_limit = "128"]
 
@@ -231,8 +230,8 @@ where
 pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
 	// Handle arguments to the #[async] attribute, if any
 	let (boxed, send) = match &attribute.to_string() as &str {
-		"( boxed )" => (true, false),
-		"( boxed_send )" => (true, true),
+		"boxed" => (true, false),
+		"boxed_send" => (true, true),
 		"" => (false, false),
 		_ => panic!("the #[async] attribute currently only takes `boxed` as an arg"),
 	};
@@ -536,7 +535,7 @@ struct AsyncStreamArgs(Vec<AsyncStreamArg>);
 
 impl synom::Synom for AsyncStreamArgs {
 	named!(parse -> Self, map!(
-        option!(parens!(call!(Punctuated::<AsyncStreamArg, syn::token::Comma>::parse_separated_nonempty))),
-        |p| AsyncStreamArgs(p.map(|d| d.1.into_iter().collect()).unwrap_or_default())
+        option!(call!(Punctuated::<AsyncStreamArg, syn::token::Comma>::parse_separated_nonempty)),
+        |p| AsyncStreamArgs(p.map(|d| d.into_iter().collect()).unwrap_or_default())
     ));
 }
