@@ -547,10 +547,11 @@ Say you've got a trait like:
 ```rust
 trait Service {
     type Request;
+    type Response;
     type Error;
     type Future: Future<Item = Self::Response, Error = Self::Error>;
 
-    fn call(&self) -> Self::Future;
+    fn call(&self, req: Self::Request) -> Self::Future;
 }
 ```
 
@@ -564,10 +565,11 @@ For now the best solution is to use `Box<Future<...>>`:
 ```rust
 impl Service for MyStruct {
     type Request = ...;
+    type Response = ...;
     type Error = ...;
-    type Future = Box<Future<Item = Self::Item, Error = Self::Error>>;
+    type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
 
-    fn call(&self) -> Self::Future {
+    fn call(&self, req: Self::Request) -> Self::Future {
         // ...
         Box::new(future)
     }
@@ -589,5 +591,5 @@ at your option.
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in Serde by you, as defined in the Apache-2.0 license, shall be
-dual licensed as above, without any additional terms or conditions.
+for inclusion in futures-await by you, as defined in the Apache-2.0 license,
+shall be dual licensed as above, without any additional terms or conditions.
