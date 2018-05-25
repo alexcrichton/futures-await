@@ -20,8 +20,8 @@ extern crate quote;
 extern crate syn;
 
 use proc_macro::{Delimiter, TokenStream, TokenTree};
-use proc_macro2::Span;
-use quote::{ToTokens, Tokens};
+use proc_macro2::{Span, TokenStream as Tokens};
+use quote::ToTokens;
 use syn::fold::Fold;
 use syn::punctuated::Punctuated;
 use syn::*;
@@ -133,7 +133,7 @@ where
 				colon_token,
 			}) => {
 				patterns.push(pat);
-				let ident = Ident::from(format!("__arg_{}", i));
+				let ident = Ident::new(&format!("__arg_{}", i), Span::call_site());
 				temp_bindings.push(ident.clone());
 				let pat = PatIdent {
 					by_ref: None,
@@ -172,7 +172,7 @@ where
 			#( let #patterns = #temp_bindings; )*
 			#block
 	};
-	let mut result = Tokens::new();
+	let mut result = Tokens::empty();
 	block.brace_token.surround(&mut result, |tokens| {
 		block_inner.to_tokens(tokens);
 	});
@@ -189,7 +189,7 @@ where
 					loop { yield ::futures::Async::NotReady }
 			}
 	};
-	let mut gen_body = Tokens::new();
+	let mut gen_body = Tokens::empty();
 	block.brace_token.surround(&mut gen_body, |tokens| {
 		gen_body_inner.to_tokens(tokens);
 	});
@@ -208,7 +208,7 @@ where
 	} else {
 		body_inner.into()
 	};
-	let mut body = Tokens::new();
+	let mut body = Tokens::empty();
 	block.brace_token.surround(&mut body, |tokens| {
 		body_inner.to_tokens(tokens);
 	});
@@ -464,7 +464,7 @@ impl Fold for ExpandAsyncFor {
 }
 
 fn first_last(tokens: &ToTokens) -> (Span, Span) {
-	let mut spans = Tokens::new();
+	let mut spans = Tokens::empty();
 	tokens.to_tokens(&mut spans);
 	let good_tokens = proc_macro2::TokenStream::from(spans)
 		.into_iter()
@@ -492,10 +492,10 @@ fn respan(
 }
 
 fn replace_bang(input: proc_macro2::TokenStream, tokens: &ToTokens) -> proc_macro2::TokenStream {
-	let mut new_tokens = Tokens::new();
+	let mut new_tokens = Tokens::empty();
 	for token in input.into_iter() {
 		match token {
-			proc_macro2::TokenTree::Op(op) if op.op() == '!' => tokens.to_tokens(&mut new_tokens),
+			proc_macro2::TokenTree::Punct(ref op) if op.as_char() == '!' => tokens.to_tokens(&mut new_tokens),
 			_ => token.to_tokens(&mut new_tokens),
 		}
 	}
@@ -507,10 +507,10 @@ fn replace_bangs(
 	replacements: &[&ToTokens],
 ) -> proc_macro2::TokenStream {
 	let mut replacements = replacements.iter().cycle();
-	let mut new_tokens = Tokens::new();
+	let mut new_tokens = Tokens::empty();
 	for token in input.into_iter() {
 		match token {
-			proc_macro2::TokenTree::Op(op) if op.op() == '!' => {
+			proc_macro2::TokenTree::Punct(ref op) if op.as_char() == '!' => {
 				replacements.next().unwrap().to_tokens(&mut new_tokens);
 			}
 			_ => token.to_tokens(&mut new_tokens),
