@@ -1,10 +1,10 @@
-#![feature(proc_macro, generators)]
+#![feature(generators)]
 
 extern crate futures_await as futures;
 
 use futures::prelude::*;
 
-#[async]
+#[r#async]
 fn foobar() -> Result<Option<i32>, ()> {
     let val = Some(42);
     if val.is_none() {
@@ -26,7 +26,7 @@ fn foobars() -> Result<(), ()> {
     Ok(())
 }
 
-#[async]
+#[r#async]
 fn tuple() -> Result<(i32, i32), ()> {
     if false {
         return Ok(3);

@@ -1,5 +1,5 @@
 #![allow(warnings)]
-#![feature(proc_macro, generators)]
+#![feature(generators)]
 
 extern crate futures_await as futures;
 
@@ -9,16 +9,16 @@ fn bar<'a>(a: &'a str) -> Box<Future<Item = i32, Error = u32> + 'a> {
     panic!()
 }
 
-#[async]
+#[r#async]
 fn foo(a: String) -> Result<i32, u32> {
-    await!(bar(&a))?;
+    r#await!(bar(&a))?;
     drop(a);
     Ok(1)
 }
 
 #[async_stream(item = i32)]
 fn foos(a: String) -> Result<(), u32> {
-    await!(bar(&a))?;
+    r#await!(bar(&a))?;
     drop(a);
     stream_yield!(5);
     Ok(())

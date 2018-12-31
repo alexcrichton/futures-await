@@ -1,5 +1,5 @@
 #![allow(warnings)]
-#![feature(proc_macro, generators)]
+#![feature(generators)]
 
 extern crate futures_await as futures;
 
