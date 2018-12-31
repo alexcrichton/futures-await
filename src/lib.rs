@@ -13,7 +13,6 @@
 //! See the crates's README for more information about usage.
 
 #![feature(generator_trait)]
-#![feature(use_extern_macros)]
 #![feature(on_unimplemented)]
 
 extern crate futures_await_async_macro as async_macro;
@@ -24,8 +23,8 @@ pub use futures::*;
 
 pub mod prelude {
     pub use futures::prelude::*;
-    pub use async_macro::{async, async_stream, async_block, async_stream_block};
-    pub use await_macro::{await, stream_yield, await_item};
+    pub use async_macro::{async_block, async_stream, async_stream_block, r#async};
+    pub use await_macro::{await_item, r#await, stream_yield};
 }
 
 /// A hidden module that's the "runtime support" for the async/await syntax.

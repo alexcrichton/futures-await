@@ -9,19 +9,13 @@
 //! Currently this crate depends on `syn` and `quote` to do all the heavy
 //! lifting, this is just a very small shim around creating a closure/future out
 //! of a generator.
-#![feature(proc_macro)]
 #![recursion_limit = "128"]
 
 extern crate proc_macro;
-extern crate proc_macro2;
-#[macro_use]
-extern crate quote;
-#[macro_use]
-extern crate syn;
 
 use proc_macro::{Delimiter, TokenStream, TokenTree};
 use proc_macro2::{Span, TokenStream as Tokens};
-use quote::ToTokens;
+use quote::{quote_spanned, ToTokens};
 use syn::fold::Fold;
 use syn::punctuated::Punctuated;
 use syn::*;
@@ -172,7 +166,7 @@ where
 			#( let #patterns = #temp_bindings; )*
 			#block
 	};
-	let mut result = Tokens::empty();
+	let mut result = Tokens::new();
 	block.brace_token.surround(&mut result, |tokens| {
 		block_inner.to_tokens(tokens);
 	});
@@ -189,7 +183,7 @@ where
 					loop { yield ::futures::Async::NotReady }
 			}
 	};
-	let mut gen_body = Tokens::empty();
+	let mut gen_body = Tokens::new();
 	block.brace_token.surround(&mut gen_body, |tokens| {
 		gen_body_inner.to_tokens(tokens);
 	});
@@ -208,7 +202,7 @@ where
 	} else {
 		body_inner.into()
 	};
-	let mut body = Tokens::empty();
+	let mut body = Tokens::new();
 	block.brace_token.surround(&mut body, |tokens| {
 		body_inner.to_tokens(tokens);
 	});
@@ -227,7 +221,7 @@ where
 }
 
 #[proc_macro_attribute]
-pub fn async(attribute: TokenStream, function: TokenStream) -> TokenStream {
+pub fn r#async(attribute: TokenStream, function: TokenStream) -> TokenStream {
 	// Handle arguments to the #[async] attribute, if any
 	let (boxed, send) = match &attribute.to_string() as &str {
 		"boxed" => (true, false),
@@ -401,7 +395,7 @@ struct ExpandAsyncFor;
 impl Fold for ExpandAsyncFor {
 	fn fold_expr(&mut self, expr: Expr) -> Expr {
 		let expr = fold::fold_expr(self, expr);
-		let mut async = false;
+		let mut r#async = false;
 		{
 			let attrs = match expr {
 				Expr::ForLoop(syn::ExprForLoop { ref attrs, .. }) => attrs,
@@ -410,11 +404,11 @@ impl Fold for ExpandAsyncFor {
 			if attrs.len() == 1 {
 				// TODO: more validation here
 				if attrs[0].path.segments.first().unwrap().value().ident == "async" {
-					async = true;
+					r#async = true;
 				}
 			}
 		}
-		if !async {
+		if !r#async {
 			return expr;
 		}
 		let all = match expr {
@@ -464,7 +458,7 @@ impl Fold for ExpandAsyncFor {
 }
 
 fn first_last(tokens: &ToTokens) -> (Span, Span) {
-	let mut spans = Tokens::empty();
+	let mut spans = Tokens::new();
 	tokens.to_tokens(&mut spans);
 	let good_tokens = proc_macro2::TokenStream::from(spans)
 		.into_iter()
@@ -492,7 +486,7 @@ fn respan(
 }
 
 fn replace_bang(input: proc_macro2::TokenStream, tokens: &ToTokens) -> proc_macro2::TokenStream {
-	let mut new_tokens = Tokens::empty();
+	let mut new_tokens = Tokens::new();
 	for token in input.into_iter() {
 		match token {
 			proc_macro2::TokenTree::Punct(ref op) if op.as_char() == '!' => tokens.to_tokens(&mut new_tokens),
@@ -507,7 +501,7 @@ fn replace_bangs(
 	replacements: &[&ToTokens],
 ) -> proc_macro2::TokenStream {
 	let mut replacements = replacements.iter().cycle();
-	let mut new_tokens = Tokens::empty();
+	let mut new_tokens = Tokens::new();
 	for token in input.into_iter() {
 		match token {
 			proc_macro2::TokenTree::Punct(ref op) if op.as_char() == '!' => {

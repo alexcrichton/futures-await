@@ -2,7 +2,7 @@
 //!
 //! Very similar to the example at https://tokio.rs
 
-#![feature(proc_macro, proc_macro_non_items, generators)]
+#![feature(generators, proc_macro_hygiene)]
 
 extern crate futures_await as futures;
 extern crate tokio_core;
@@ -10,7 +10,7 @@ extern crate tokio_io;
 
 use std::io::{self, BufReader};
 
-use futures::prelude::*;
+use futures::prelude::{r#await, *};
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Core;
 use tokio_io::{AsyncRead};
@@ -43,18 +43,18 @@ fn main() {
     core.run(server).unwrap();
 }
 
-#[async]
+#[r#async]
 fn handle_client(socket: TcpStream) -> io::Result<u64> {
     let (reader, mut writer) = socket.split();
     let input = BufReader::new(reader);
 
     let mut total = 0;
 
-    #[async]
+    #[r#async]
     for line in tokio_io::io::lines(input) {
         println!("got client line: {}", line);
         total += line.len() as u64;
-        writer = await!(tokio_io::io::write_all(writer, line))?.0;
+        writer = r#await!(tokio_io::io::write_all(writer, line))?.0;
     }
 
     Ok(total)

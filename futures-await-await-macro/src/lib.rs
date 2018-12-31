@@ -9,7 +9,7 @@
 // importable via `futurses_await::prelude::await`?
 
 #[macro_export]
-macro_rules! await {
+macro_rules! r#await {
     ($e:expr) => ({
         let mut future = $e;
         loop {
@@ -51,13 +51,9 @@ macro_rules! await_item {
     })
 }
 
-// TODO: This macro needs to use an extra temporary variable because of
-// rust-lang/rust#44197, once that's fixed this should just use $e directly
-// inside the yield expression
 #[macro_export]
 macro_rules! stream_yield {
-    ($e:expr) => ({
-        let e = $e;
-        yield ::futures::Async::Ready(e)
-    })
+    ($e:expr) => {
+        yield ::futures::Async::Ready($e)
+    };
 }
