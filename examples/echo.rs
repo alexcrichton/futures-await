@@ -13,7 +13,7 @@ use std::io::{self, BufReader};
 use futures::prelude::{r#await, *};
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Core;
-use tokio_io::{AsyncRead};
+use tokio_io::AsyncRead;
 
 fn main() {
     // Create the event loop that will drive this server
@@ -23,8 +23,7 @@ fn main() {
     // Bind the server's socket
     let addr = "127.0.0.1:12345".parse().unwrap();
     let tcp = TcpListener::bind(&addr, &handle).expect("failed to bind listener");
-    println!("listening for connections on {}",
-             tcp.local_addr().unwrap());
+    println!("listening for connections on {}", tcp.local_addr().unwrap());
 
     let server = async_block! {
         #[async]

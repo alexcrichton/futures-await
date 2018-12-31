@@ -10,21 +10,21 @@
 
 #[macro_export]
 macro_rules! r#await {
-    ($e:expr) => ({
+    ($e:expr) => {{
         let mut future = $e;
         loop {
             match ::futures::Future::poll(&mut future) {
                 ::futures::__rt::std::result::Result::Ok(::futures::Async::Ready(e)) => {
-                    break ::futures::__rt::std::result::Result::Ok(e)
+                    break ::futures::__rt::std::result::Result::Ok(e);
                 }
                 ::futures::__rt::std::result::Result::Ok(::futures::Async::NotReady) => {}
                 ::futures::__rt::std::result::Result::Err(e) => {
-                    break ::futures::__rt::std::result::Result::Err(e)
+                    break ::futures::__rt::std::result::Result::Err(e);
                 }
             }
             yield ::futures::Async::NotReady
         }
-    })
+    }};
 }
 
 ///
@@ -34,21 +34,21 @@ macro_rules! r#await {
 
 #[macro_export]
 macro_rules! await_item {
-    ($e:expr) => ({
+    ($e:expr) => {{
         loop {
             match ::futures::Stream::poll(&mut $e) {
                 ::futures::__rt::std::result::Result::Ok(::futures::Async::Ready(e)) => {
-                    break ::futures::__rt::std::result::Result::Ok(e)
+                    break ::futures::__rt::std::result::Result::Ok(e);
                 }
                 ::futures::__rt::std::result::Result::Ok(::futures::Async::NotReady) => {}
                 ::futures::__rt::std::result::Result::Err(e) => {
-                    break ::futures::__rt::std::result::Result::Err(e)
+                    break ::futures::__rt::std::result::Result::Err(e);
                 }
             }
 
             yield ::futures::Async::NotReady
         }
-    })
+    }};
 }
 
 #[macro_export]

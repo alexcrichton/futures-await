@@ -19,7 +19,7 @@ fn foo() -> Result<i32, i32> {
 }
 
 #[r#async]
-extern fn _foo1() -> Result<i32, i32> {
+extern "C" fn _foo1() -> Result<i32, i32> {
     Ok(1)
 }
 
@@ -29,7 +29,7 @@ unsafe fn _foo2() -> io::Result<i32> {
 }
 
 #[r#async]
-unsafe extern fn _foo3() -> io::Result<i32> {
+unsafe extern "C" fn _foo3() -> io::Result<i32> {
     Ok(1)
 }
 
@@ -50,14 +50,15 @@ fn _foo6(ref a: i32) -> Result<i32, i32> {
 
 #[r#async]
 fn _foo7<T>(t: T) -> Result<T, i32>
-    where T: Clone + 'static,
+where
+    T: Clone + 'static,
 {
     Ok(t.clone())
 }
 
 #[r#async(boxed)]
 fn _foo8(a: i32, b: i32) -> Result<i32, i32> {
-    return Ok(a + b)
+    return Ok(a + b);
 }
 
 #[r#async(boxed_send)]
@@ -125,7 +126,9 @@ fn _stream4() -> Result<(), i32> {
     Ok(())
 }
 
-mod foo { pub struct Foo(pub i32); }
+mod foo {
+    pub struct Foo(pub i32);
+}
 
 #[async_stream(boxed, item = foo::Foo)]
 pub fn stream5() -> Result<(), i32> {
@@ -224,7 +227,9 @@ fn loop_in_loop() -> Result<bool, i32> {
         }
     }
 
-    let sum = (1..5).map(|x| (1..5).map(|y| x * y).sum::<i32>()).sum::<i32>();
+    let sum = (1..5)
+        .map(|x| (1..5).map(|y| x * y).sum::<i32>())
+        .sum::<i32>();
     Ok(cnt == sum)
 }
 
