@@ -39,12 +39,13 @@ pub mod prelude {
 #[doc(hidden)]
 pub mod __rt {
     pub extern crate std;
-    pub use std::ops::Generator;
-
+    use core::{
+        marker::{PhantomData, Unpin},
+        ops::{Generator, GeneratorState},
+        pin::Pin,
+    };
     use futures::Poll;
     use futures::{Async, Future, Stream};
-    use std::marker::PhantomData;
-    use std::ops::GeneratorState;
 
     pub trait MyFuture<T: IsResult>: Future<Item = T::Ok, Error = T::Err> {}
 
@@ -76,7 +77,7 @@ pub mod __rt {
         type Ok = T;
         type Err = E;
 
-        fn into_result(self) -> Result<Self::Ok, Self::Err> {
+        fn into_result(self) -> Result<T, E> {
             self
         }
     }
@@ -104,7 +105,7 @@ pub mod __rt {
 
     pub fn gen<T>(gen: T) -> impl MyFuture<T::Return>
     where
-        T: Generator<Yield = Async<Mu>>,
+        T: Generator<Yield = Async<Mu>> + Unpin,
         T::Return: IsResult,
     {
         GenFuture(gen)
@@ -112,7 +113,7 @@ pub mod __rt {
 
     pub fn gen_stream<T, U>(gen: T) -> impl MyStream<U, T::Return>
     where
-        T: Generator<Yield = Async<U>>,
+        T: Generator<Yield = Async<U>> + Unpin,
         T::Return: IsResult<Ok = ()>,
     {
         GenStream {
@@ -124,14 +125,14 @@ pub mod __rt {
 
     impl<T> Future for GenFuture<T>
     where
-        T: Generator<Yield = Async<Mu>>,
+        T: Generator<Yield = Async<Mu>> + Unpin,
         T::Return: IsResult,
     {
         type Item = <T::Return as IsResult>::Ok;
         type Error = <T::Return as IsResult>::Err;
 
         fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-            match unsafe { self.0.resume() } {
+            match Pin::new(&mut self.0).resume() {
                 GeneratorState::Yielded(Async::NotReady) => Ok(Async::NotReady),
                 GeneratorState::Yielded(Async::Ready(mu)) => match mu {},
                 GeneratorState::Complete(e) => e.into_result().map(Async::Ready),
@@ -141,7 +142,7 @@ pub mod __rt {
 
     impl<U, T> Stream for GenStream<U, T>
     where
-        T: Generator<Yield = Async<U>>,
+        T: Generator<Yield = Async<U>> + Unpin,
         T::Return: IsResult<Ok = ()>,
     {
         type Item = U;
@@ -151,7 +152,7 @@ pub mod __rt {
             if self.done {
                 return Ok(Async::Ready(None));
             }
-            match unsafe { self.gen.resume() } {
+            match Pin::new(&mut self.gen).resume() {
                 GeneratorState::Yielded(Async::Ready(e)) => Ok(Async::Ready(Some(e))),
                 GeneratorState::Yielded(Async::NotReady) => Ok(Async::NotReady),
                 GeneratorState::Complete(e) => {
