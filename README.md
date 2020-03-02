@@ -1,5 +1,8 @@
 # futures-await
 
+> This crate is no longer necessary now that async/await are formally parts of
+> the Rust language, thanks to everyone who helped make this a reality!
+
 Async/await syntax for Rust and the [`futures`] crate
 
 [`futures`]: https://crates.io/crates/futures
