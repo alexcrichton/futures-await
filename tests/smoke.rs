@@ -3,90 +3,91 @@
 //! This is mostly a test for this repository itself, not necessarily serving
 //! much more purpose than that.
 
-#![feature(proc_macro, proc_macro_non_items, generators)]
+#![feature(generators, proc_macro_hygiene)]
 
 extern crate futures_await as futures;
 extern crate futures_cpupool;
 
 use std::io;
 
-use futures::prelude::*;
+use futures::prelude::{r#await, *};
 use futures_cpupool::CpuPool;
 
-#[async]
+#[r#async]
 fn foo() -> Result<i32, i32> {
     Ok(1)
 }
 
-#[async]
-extern fn _foo1() -> Result<i32, i32> {
+#[r#async]
+extern "C" fn _foo1() -> Result<i32, i32> {
     Ok(1)
 }
 
-#[async]
+#[r#async]
 unsafe fn _foo2() -> io::Result<i32> {
     Ok(1)
 }
 
-#[async]
-unsafe extern fn _foo3() -> io::Result<i32> {
+#[r#async]
+unsafe extern "C" fn _foo3() -> io::Result<i32> {
     Ok(1)
 }
 
-#[async]
+#[r#async]
 pub fn _foo4() -> io::Result<i32> {
     Ok(1)
 }
 
-#[async]
+#[r#async]
 fn _foo5<T: Clone + 'static>(t: T) -> Result<T, i32> {
     Ok(t.clone())
 }
 
-#[async]
+#[r#async]
 fn _foo6(ref a: i32) -> Result<i32, i32> {
     Err(*a)
 }
 
-#[async]
+#[r#async]
 fn _foo7<T>(t: T) -> Result<T, i32>
-    where T: Clone + 'static,
+where
+    T: Clone + 'static,
 {
     Ok(t.clone())
 }
 
-#[async(boxed)]
+#[r#async(boxed)]
 fn _foo8(a: i32, b: i32) -> Result<i32, i32> {
-    return Ok(a + b)
+    return Ok(a + b);
 }
 
-#[async(boxed_send)]
+#[r#async(boxed_send)]
 fn _foo9() -> Result<(), ()> {
     Ok(())
 }
 
-#[async]
+#[r#async]
 fn _bar() -> Result<i32, i32> {
-    await!(foo())
+    r#await!(foo())
 }
 
-#[async]
+#[r#async]
 fn _bar2() -> Result<i32, i32> {
-    let a = await!(foo())?;
-    let b = await!(foo())?;
+    let a = r#await!(foo())?;
+    let b = r#await!(foo())?;
     Ok(a + b)
 }
 
-#[async]
+#[r#async]
 fn _bar3() -> Result<i32, i32> {
-    let (a, b) = await!(foo().join(foo()))?;
+    let (a, b) = r#await!(foo().join(foo()))?;
     Ok(a + b)
 }
 
-#[async]
+#[r#async]
 fn _bar4() -> Result<i32, i32> {
     let mut cnt = 0;
-    #[async]
+    #[r#async]
     for x in futures::stream::iter_ok::<_, i32>(vec![1, 2, 3, 4]) {
         cnt += x;
     }
@@ -110,7 +111,7 @@ fn _stream2<T: Clone + 'static>(t: T) -> Result<(), i32> {
 #[async_stream(item = i32)]
 fn _stream3() -> Result<(), i32> {
     let mut cnt = 0;
-    #[async]
+    #[r#async]
     for x in futures::stream::iter_ok::<_, i32>(vec![1, 2, 3, 4]) {
         cnt += x;
         stream_yield!(x);
@@ -125,7 +126,9 @@ fn _stream4() -> Result<(), i32> {
     Ok(())
 }
 
-mod foo { pub struct Foo(pub i32); }
+mod foo {
+    pub struct Foo(pub i32);
+}
 
 #[async_stream(boxed, item = foo::Foo)]
 pub fn stream5() -> Result<(), i32> {
@@ -136,7 +139,7 @@ pub fn stream5() -> Result<(), i32> {
 
 #[async_stream(boxed, item = i32)]
 pub fn _stream6() -> Result<(), i32> {
-    #[async]
+    #[r#async]
     for foo::Foo(i) in stream5() {
         stream_yield!(i * i);
     }
@@ -188,7 +191,7 @@ fn await_item_stream() -> Result<(), i32> {
     Ok(())
 }
 
-#[async]
+#[r#async]
 fn test_await_item() -> Result<(), ()> {
     let mut stream = await_item_stream();
 
@@ -212,19 +215,21 @@ fn main() {
     assert_eq!(test_await_item().wait(), Ok(()));
 }
 
-#[async]
+#[r#async]
 fn loop_in_loop() -> Result<bool, i32> {
     let mut cnt = 0;
     let vec = vec![1, 2, 3, 4];
-    #[async]
+    #[r#async]
     for x in futures::stream::iter_ok::<_, i32>(vec.clone()) {
-        #[async]
+        #[r#async]
         for y in futures::stream::iter_ok::<_, i32>(vec.clone()) {
             cnt += x * y;
         }
     }
 
-    let sum = (1..5).map(|x| (1..5).map(|y| x * y).sum::<i32>()).sum::<i32>();
+    let sum = (1..5)
+        .map(|x| (1..5).map(|y| x * y).sum::<i32>())
+        .sum::<i32>();
     Ok(cnt == sum)
 }
 

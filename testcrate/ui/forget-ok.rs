@@ -2,7 +2,7 @@
 
 extern crate futures_await as futures;
 
-use futures::prelude::*;
+use futures::prelude::{*, r#await};
 
 #[async]
 fn foo() -> Result<(), ()> {
